@@ -7,10 +7,8 @@ import { buildHandState } from './hand/gestures';
 import { initHandLandmarker, detectHands } from './hand/landmarker';
 import { PalmStabilityTracker, type RawLandmark } from './hand/palm';
 import { GrowthEngine } from './growth/engine';
-import { Bloom } from './growth/bloom';
+import { Flower } from './growth/flower';
 import { Roots } from './growth/roots';
-import { Soil } from './growth/soil';
-import { buildRelief } from './capture/relief';
 import { ARScene } from './render/scene';
 import { landmarkSpan, landmarkToScreen, landmarkToWorld } from './render/anchor';
 import { StageMachine } from './stages';
@@ -66,11 +64,8 @@ const debugOverlay = isDebugEnabled() ? new DebugOverlay(debugCanvas) : null;
 let growthEngine: GrowthEngine | null = null;
 let currentDna: FlowerDNA | null = null;
 let roots: Roots | null = null;
-let bloom: Bloom | null = null;
-let soil: Soil | null = null;
+let flower: Flower | null = null;
 let captureTexture: THREE.CanvasTexture | null = null;
-let handTexture: THREE.CanvasTexture | null = null;
-let handCaptured = false;
 
 let capturing = false;
 let manualShutterTrigger = false;
@@ -151,17 +146,12 @@ function disposeGrowthVisuals(): void {
     arScene.overlayGroup.remove(roots.group);
     roots.dispose();
   }
-  if (bloom) {
-    arScene.overlayGroup.remove(bloom.mesh, bloom.particles);
-    bloom.dispose();
-  }
-  if (soil) {
-    arScene.overlayGroup.remove(soil.mesh);
-    soil.dispose();
+  if (flower) {
+    arScene.overlayGroup.remove(flower.group, flower.particles);
+    flower.dispose();
   }
   roots = null;
-  bloom = null;
-  soil = null;
+  flower = null;
 }
 
 async function runCapturePipeline(pinchPoint: { x: number; y: number }): Promise<void> {
@@ -170,7 +160,6 @@ async function runCapturePipeline(pinchPoint: { x: number; y: number }): Promise
   const frame = freezeFrame();
   const matted = await segmentFrame(frame, pinchPoint);
   const dna = extractFlowerDNA(matted);
-  const relief = buildRelief(matted);
 
   currentDna = dna;
   captureTexture?.dispose();
@@ -178,12 +167,10 @@ async function runCapturePipeline(pinchPoint: { x: number; y: number }): Promise
   captureTexture.colorSpace = THREE.SRGBColorSpace;
 
   disposeGrowthVisuals();
-  handCaptured = false;
   growthEngine = new GrowthEngine(dna);
   roots = new Roots();
-  bloom = new Bloom(dna, relief);
-  bloom.setTexture(captureTexture);
-  arScene.overlayGroup.add(roots.group, bloom.mesh, bloom.particles);
+  flower = new Flower(dna);
+  arScene.overlayGroup.add(roots.group, flower.group, flower.particles);
 
   arScene.beginReveal(captureTexture, matted.width / matted.height);
   revealStartMs = performance.now();
@@ -202,30 +189,10 @@ async function runCapturePipeline(pinchPoint: { x: number; y: number }): Promise
   // Stage-section visibility is driven every frame by updateStageUI in the loop.
 }
 
-/** Captures the open palm once, at the moment growth begins, as the dimensional soil ground. */
-async function captureHandSoil(palmPoint: { x: number; y: number }): Promise<void> {
-  handCaptured = true;
-  const frame = freezeFrame();
-  const matted = await segmentFrame(frame, palmPoint);
-  const relief = buildRelief(matted);
-  handTexture?.dispose();
-  handTexture = new THREE.CanvasTexture(matted);
-  handTexture.colorSpace = THREE.SRGBColorSpace;
-  if (soil) {
-    arScene.overlayGroup.remove(soil.mesh);
-    soil.dispose();
-  }
-  soil = new Soil(handTexture, relief);
-  arScene.overlayGroup.add(soil.mesh);
-}
-
 function resetToCapture(): void {
   disposeGrowthVisuals();
   captureTexture?.dispose();
   captureTexture = null;
-  handTexture?.dispose();
-  handTexture = null;
-  handCaptured = false;
   currentDna = null;
   growthEngine = null;
   enteredEndedAtMs = null;
@@ -314,19 +281,9 @@ function loop(nowMs: number): void {
       handScale = Math.max(0.03, landmarkSpan(primaryRaw[0]!, primaryRaw[9]!, ctx));
     }
 
-    // capture the open palm as the soil ground the moment growth begins
-    if (stageMachine.growthGateOpen && !handCaptured && primaryRaw) {
-      captureHandSoil({ x: primaryRaw[9]!.x, y: primaryRaw[9]!.y }).catch((err) => console.error(err));
-    }
-
-    // soil glitch: subtle, synced with recent mutation
-    const lastTouch = state.mutations.length ? state.age - state.mutations[state.mutations.length - 1]!.at : 999;
-    const soilGlitch = Math.min(0.5, Math.max(0, 1 - lastTouch / 0.6) * 0.5);
-
     const t = nowMs / 1000;
     roots?.update(primaryRaw, ctx, maturity);
-    soil?.update(originWorld, handScale, hand.present, soilGlitch, t);
-    if (currentDna) bloom?.update(currentDna, state, originWorld, handScale, hand.present, t, dtSeconds);
+    if (currentDna) flower?.update(currentDna, state, originWorld, handScale, hand.present, t, dtSeconds);
   }
 
   if (revealStartMs !== null) {
@@ -359,9 +316,8 @@ function loop(nowMs: number): void {
   updateRings(stage, primaryRaw);
 
   if (stage === 'ENDED' && enteredEndedAtMs !== null && nowMs - enteredEndedAtMs > 1200) {
-    if (bloom) bloom.mesh.visible = false;
+    if (flower) flower.group.visible = false;
     if (roots) roots.group.visible = false;
-    if (soil) soil.mesh.visible = false;
   }
 
   promptUI.set(promptForStage(stage, { handPresent: hand.present, capturing }));

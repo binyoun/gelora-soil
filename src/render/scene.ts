@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { AnchorContext } from './anchor';
 
 const ANCHOR_DISTANCE = 1.2;
@@ -24,6 +25,8 @@ export class ARScene {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.setClearColor(0x000000, 0);
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.05;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
     this.scene = new THREE.Scene();
@@ -33,10 +36,18 @@ export class ARScene {
     this.overlayGroup = new THREE.Group();
     this.scene.add(this.overlayGroup);
 
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x1a1005, 1.4));
-    const key = new THREE.DirectionalLight(0xffffff, 0.7);
-    key.position.set(0.5, 1, 1);
+    // Soft studio environment so MeshStandardMaterial reads with real shading
+    // and gentle reflections (same PMREM approach as the uncanny-garden models).
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x1a1005, 0.8));
+    const key = new THREE.DirectionalLight(0xffffff, 1.1);
+    key.position.set(0.5, 1, 0.8);
     this.scene.add(key);
+    const rim = new THREE.DirectionalLight(0xffe9c8, 0.5);
+    rim.position.set(-0.6, 0.2, -0.5);
+    this.scene.add(rim);
 
     // "this is who will grow": the captured flower floats in front of the feed
     // for a moment after capture, then fades as the being takes root.
