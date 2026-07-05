@@ -1,18 +1,21 @@
 import * as THREE from 'three';
-import type { FlowerDNA, HandState } from '../types';
-import { landmarkDirectionToWorld, landmarkToWorld, type AnchorMapping } from '../render/anchor';
+import type { FlowerDNA } from '../types';
 import stemFrag from './shaders/stem.frag.glsl?raw';
 import stemVert from './shaders/stem.vert.glsl?raw';
 
-const MAX_STEM_HEIGHT = 0.72;
-const STEM_RADIUS = 0.018;
+const STEM_HEIGHT_PER_HAND = 3.2; // stem height as a multiple of hand span
+const STEM_RADIUS_PER_HAND = 0.11;
 
-/** Curve extrusion along the palm normal. Rises with maturity, droops with wilt. */
+const UP = new THREE.Vector3(0, 1, 0);
+const tmpDir = new THREE.Vector3();
+const tmpQuat = new THREE.Quaternion();
+
+/** Rises from the palm along screen-up, scaled to the hand. Droops with wilt. */
 export class Stem {
   readonly mesh: THREE.Mesh<THREE.CylinderGeometry, THREE.ShaderMaterial>;
 
   constructor(dna: FlowerDNA) {
-    const geometry = new THREE.CylinderGeometry(STEM_RADIUS * 0.4, STEM_RADIUS, 1, 8, 12, true);
+    const geometry = new THREE.CylinderGeometry(0.4, 1, 1, 8, 12, true);
     geometry.translate(0, 0.5, 0); // pivot at base
 
     const baseColor = new THREE.Color().setHSL(dna.hueCenter / 360, Math.max(0.3, dna.saturation * 0.6), 0.3);
@@ -33,24 +36,29 @@ export class Stem {
     this.mesh.visible = false;
   }
 
-  update(hand: HandState, map: AnchorMapping, maturity: number, wiltAmount: number, time: number): void {
-    if (!hand.present || maturity <= 0) {
+  update(
+    originWorld: THREE.Vector3,
+    handScale: number,
+    present: boolean,
+    maturity: number,
+    wiltAmount: number,
+    time: number,
+  ): void {
+    if (!present || maturity <= 0) {
       this.mesh.visible = false;
       return;
     }
     this.mesh.visible = true;
 
-    const origin = landmarkToWorld(hand.palmOrigin, map);
-    const normal = landmarkDirectionToWorld(hand.palmNormal, map);
+    this.mesh.position.copy(originWorld);
+    const height = STEM_HEIGHT_PER_HAND * handScale * smoothstep(0, 0.3, maturity);
+    const radius = STEM_RADIUS_PER_HAND * handScale;
+    this.mesh.scale.set(radius, Math.max(0.001, height), radius);
 
-    this.mesh.position.copy(origin);
-    const height = MAX_STEM_HEIGHT * smoothstep(0, 0.3, maturity);
-    this.mesh.scale.set(1, Math.max(0.001, height), 1);
-
-    const droopTarget = new THREE.Vector3(normal.x, normal.y - 1, normal.z).normalize();
-    const drooped = normal.clone().lerp(droopTarget, wiltAmount * 0.6).normalize();
-    const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), drooped);
-    this.mesh.quaternion.copy(quat);
+    // rise along screen-up, drooping toward the side as care recedes (wilt)
+    tmpDir.set(wiltAmount * 0.8, 1 - wiltAmount * 0.5, 0).normalize();
+    tmpQuat.setFromUnitVectors(UP, tmpDir);
+    this.mesh.quaternion.copy(tmpQuat);
 
     this.mesh.material.uniforms.uTime!.value = time;
     this.mesh.material.uniforms.uMaturity!.value = maturity;

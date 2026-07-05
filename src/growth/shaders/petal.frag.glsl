@@ -2,11 +2,19 @@ precision mediump float;
 
 uniform sampler2D uTexture;
 uniform float uWilt;
+uniform float uTime;
+uniform float uGlitch;
+uniform vec3 uTint;
 
 varying vec2 vRegionUv;
+varying vec2 vPetalUv;
 varying float vHueShift;
 varying float vWarp;
 varying float vFall;
+
+float glitchHash(vec2 p) {
+  return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+}
 
 vec3 rgb2hsv(vec3 c) {
   vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
@@ -32,6 +40,26 @@ void main() {
   vec3 shifted = hsv2rgb(hsv);
 
   vec3 wiltedColor = mix(shifted, vec3(0.29, 0.22, 0.12), uWilt * 0.5);
+
+  // glitch: block-based RGB corruption and colored dropout across the petal
+  // surface, driven by uGlitch (uncanny-garden aesthetic)
+  if (uGlitch > 0.001) {
+    vec2 block = floor(vPetalUv * 12.0);
+    float t = floor(uTime * 12.0);
+    float hr = glitchHash(block + t + 11.1);
+    float hg = glitchHash(block + t + 37.7);
+    float hb = glitchHash(block + t + 71.3);
+    float h  = glitchHash(block + t);
+
+    vec3 corrupt = wiltedColor;
+    corrupt.r += (hr - 0.5) * 0.9;
+    corrupt.g += (hg - 0.5) * 0.9;
+    corrupt.b += (hb - 0.5) * 0.9;
+
+    float dropout = step(1.0 - uGlitch * 0.5, h);
+    corrupt = mix(corrupt, uTint, dropout);
+    wiltedColor = mix(wiltedColor, corrupt, uGlitch);
+  }
 
   float fallFade = 1.0 - smoothstep(0.6, 1.0, vFall);
 

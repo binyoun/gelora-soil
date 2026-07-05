@@ -2,73 +2,54 @@ import * as THREE from 'three';
 import type { Vec3 } from '../types';
 
 /**
- * Maps normalized landmark-space points (x,y in [0,1] raw video-frame space,
- * z MediaPipe pseudo-depth relative to the wrist) onto world space, so a
- * Three.js object anchored here tracks the hand under the camera background
- * plane. The background plane always fills the viewport ("object-fit: cover"),
- * so the video is cropped relative to its raw frame; landmark coordinates are
- * corrected by the same crop before projecting into world space.
+ * Anchors landmark-space points into the transparent WebGL layer that sits over
+ * the fullscreen DOM camera video (same layering as the uncanny-garden work).
+ *
+ * Landmarks arrive in raw video-frame coordinates (x,y in [0,1] of the sensor
+ * frame). The video is shown with object-fit: cover, so only a centered crop is
+ * on screen; we correct for that crop (and front-camera mirroring) to get true
+ * on-screen coordinates, then unproject through the camera to a fixed distance.
+ * Depth comes from that fixed distance, never from MediaPipe's unreliable
+ * pseudo-z, so the being always renders exactly where the hand appears.
  */
-export interface AnchorMapping {
-  planeWidth: number;
-  planeHeight: number;
-  planeDistance: number;
-  mirrorX: boolean;
-  depthScale: number;
-  cropOffsetX: number;
-  cropOffsetY: number;
-  cropRepeatX: number;
-  cropRepeatY: number;
+export interface AnchorContext {
+  camera: THREE.PerspectiveCamera;
+  distance: number;
+  videoAspect: number;
+  viewportAspect: number;
+  mirror: boolean;
 }
 
-export function computeAnchorMapping(
-  camera: THREE.PerspectiveCamera,
-  planeDistance: number,
-  viewportAspect: number,
-  videoAspect: number,
-  mirrorX: boolean,
-): AnchorMapping {
-  const vFov = (camera.fov * Math.PI) / 180;
-  const planeHeight = 2 * Math.tan(vFov / 2) * planeDistance;
-  const planeWidth = planeHeight * viewportAspect;
-
-  let cropRepeatX = 1;
-  let cropRepeatY = 1;
-  if (viewportAspect > videoAspect) {
-    cropRepeatY = videoAspect / viewportAspect;
+/** Raw video-frame landmark coords -> on-screen normalized display coords [0,1]. */
+function landmarkToDisplay(x: number, y: number, ctx: AnchorContext): { x: number; y: number } {
+  let dx = x;
+  let dy = y;
+  if (ctx.viewportAspect > ctx.videoAspect) {
+    // viewport wider than video: video fills width, crops top/bottom
+    const frac = ctx.videoAspect / ctx.viewportAspect;
+    dy = (y - (1 - frac) / 2) / frac;
   } else {
-    cropRepeatX = viewportAspect / videoAspect;
+    // viewport taller/narrower than video: video fills height, crops left/right
+    const frac = ctx.viewportAspect / ctx.videoAspect;
+    dx = (x - (1 - frac) / 2) / frac;
   }
-  const cropOffsetX = (1 - cropRepeatX) / 2;
-  const cropOffsetY = (1 - cropRepeatY) / 2;
-
-  return {
-    planeWidth,
-    planeHeight,
-    planeDistance,
-    mirrorX,
-    depthScale: planeHeight,
-    cropOffsetX,
-    cropOffsetY,
-    cropRepeatX,
-    cropRepeatY,
-  };
+  if (ctx.mirror) dx = 1 - dx;
+  return { x: dx, y: dy };
 }
 
-export function landmarkToWorld(point: Vec3, map: AnchorMapping, out = new THREE.Vector3()): THREE.Vector3 {
-  const displayX = (point.x - map.cropOffsetX) / map.cropRepeatX;
-  const displayY = (point.y - map.cropOffsetY) / map.cropRepeatY;
-  const nx = map.mirrorX ? 1 - displayX : displayX;
-
-  out.x = (nx - 0.5) * map.planeWidth;
-  out.y = (0.5 - displayY) * map.planeHeight;
-  out.z = -map.planeDistance - point.z * map.depthScale;
+/** Landmark -> world position on the plane `distance` in front of the camera. */
+export function landmarkToWorld(point: Vec3, ctx: AnchorContext, out = new THREE.Vector3()): THREE.Vector3 {
+  const d = landmarkToDisplay(point.x, point.y, ctx);
+  const ndcX = d.x * 2 - 1;
+  const ndcY = -(d.y * 2 - 1);
+  out.set(ndcX, ndcY, 0.5).unproject(ctx.camera);
+  out.sub(ctx.camera.position).normalize().multiplyScalar(ctx.distance).add(ctx.camera.position);
   return out;
 }
 
-export function landmarkDirectionToWorld(dir: Vec3, map: AnchorMapping, out = new THREE.Vector3()): THREE.Vector3 {
-  const nx = map.mirrorX ? -dir.x : dir.x;
-  out.set(nx, -dir.y, -dir.z);
-  if (out.lengthSq() < 1e-10) out.set(0, 0, 1);
-  return out.normalize();
+/** World-space distance between two landmarks once anchored: a hand-sized scale unit. */
+export function landmarkSpan(a: Vec3, b: Vec3, ctx: AnchorContext): number {
+  const wa = landmarkToWorld(a, ctx, new THREE.Vector3());
+  const wb = landmarkToWorld(b, ctx, new THREE.Vector3());
+  return wa.distanceTo(wb);
 }

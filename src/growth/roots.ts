@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { RawLandmark } from '../hand/palm';
-import { landmarkToWorld, type AnchorMapping } from '../render/anchor';
+import { landmarkToWorld, type AnchorContext } from '../render/anchor';
 
 const FINGER_CHAINS: number[][] = [
   [0, 1, 2, 3, 4],
@@ -37,7 +37,7 @@ export class Roots {
     this.group.add(this.shadow);
   }
 
-  update(landmarks: RawLandmark[] | null, map: AnchorMapping, maturity: number): void {
+  update(landmarks: RawLandmark[] | null, ctx: AnchorContext, maturity: number): void {
     const rootsProgress = clamp01(maturity / ROOTS_STAGE_END);
     const opacity = landmarks ? Math.max(rootsProgress, maturity > 0 ? GROUNDED_OPACITY : 0) : 0;
     this.lineMaterial.opacity = opacity * 0.9;
@@ -55,8 +55,8 @@ export class Roots {
         if (vertexIndex + 2 > MAX_VERTICES) break outer;
         const a = landmarks[chain[i]!]!;
         const b = landmarks[chain[i + 1]!]!;
-        landmarkToWorld(a, map, tmpA);
-        landmarkToWorld(b, map, tmpB);
+        landmarkToWorld(a, ctx, tmpA);
+        landmarkToWorld(b, ctx, tmpB);
         positions.setXYZ(vertexIndex++, tmpA.x, tmpA.y, tmpA.z);
         positions.setXYZ(vertexIndex++, tmpB.x, tmpB.y, tmpB.z);
       }
@@ -64,9 +64,9 @@ export class Roots {
     positions.needsUpdate = true;
     this.lineGeometry.setDrawRange(0, vertexIndex);
 
-    const wrist = landmarkToWorld(landmarks[0]!, map, new THREE.Vector3());
-    this.shadow.position.set(wrist.x, wrist.y, wrist.z + 0.001);
-    const scale = 0.12 * (1 + maturity * 0.3);
+    const palm = landmarkToWorld(landmarks[9]!, ctx, new THREE.Vector3());
+    this.shadow.position.set(palm.x, palm.y, palm.z + 0.001);
+    const scale = 0.1 * (1 + maturity * 0.4);
     this.shadow.scale.set(scale, scale, scale);
   }
 

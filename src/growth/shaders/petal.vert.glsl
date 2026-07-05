@@ -1,5 +1,6 @@
 uniform float uWilt;
 uniform float uTime;
+uniform float uGlitch;
 
 attribute float aHueShift;
 attribute float aWarp;
@@ -7,17 +8,25 @@ attribute float aFall;
 attribute vec4 aRegion; // u, v, w, h into the capture texture
 
 varying vec2 vRegionUv;
+varying vec2 vPetalUv;
 varying float vHueShift;
 varying float vWarp;
 varying float vFall;
 
 void main() {
   vRegionUv = aRegion.xy + uv * aRegion.zw;
+  vPetalUv = uv;
   vHueShift = aHueShift;
   vWarp = aWarp;
   vFall = aFall;
 
   vec3 pos = position;
+
+  // glitch wobble: jittery per-vertex displacement when the being is mutating
+  if (uGlitch > 0.001) {
+    float n = sin(pos.x * 9.0 + uTime * 5.0) * sin(pos.y * 7.0 - uTime * 4.0);
+    pos += normal * n * uGlitch * 0.08;
+  }
 
   // wilt: curl the petal tip down and inward as care recedes
   float curl = uWilt * smoothstep(0.0, 1.0, uv.y);

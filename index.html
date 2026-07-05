@@ -19,14 +19,16 @@
     section.active { display: block; }
     section button { pointer-events: auto; }
 
-    canvas#scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-    /* Kept in the render tree (not display:none) so it keeps decoding frames on
-       iOS Safari; drawn only via the Three.js VideoTexture, so hide it behind
-       the canvas rather than removing it. */
+    /* Fullscreen camera video as the background layer; the transparent WebGL
+       canvas is drawn on top of it (same layering as the uncanny-garden work). */
     video#camera-feed {
-      position: absolute; top: 0; left: 0;
-      width: 2px; height: 2px; opacity: 0.01;
-      pointer-events: none; z-index: -1;
+      position: fixed; inset: 0; width: 100%; height: 100%;
+      object-fit: cover; z-index: 0; background: #000;
+    }
+    video#camera-feed.mirrored { transform: scaleX(-1); }
+    canvas#scene {
+      position: fixed; inset: 0; width: 100%; height: 100%;
+      display: block; z-index: 1;
     }
 
     canvas#debug-overlay {

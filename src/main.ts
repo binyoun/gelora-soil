@@ -11,6 +11,7 @@ import { Petals } from './growth/petals';
 import { Roots } from './growth/roots';
 import { Stem } from './growth/stem';
 import { ARScene } from './render/scene';
+import { landmarkSpan, landmarkToWorld } from './render/anchor';
 import { StageMachine } from './stages';
 import type { FlowerDNA, HandState } from './types';
 import { DebugOverlay, FpsMonitor, isDebugEnabled } from './ui/debug';
@@ -60,6 +61,8 @@ let manualShutterTrigger = false;
 let restartRequested = false;
 let enteredEndedAtMs: number | null = null;
 let revealStartMs: number | null = null;
+const originWorld = new THREE.Vector3();
+let handScale = 0.15;
 let pixelRatioHalved = false;
 let prevStage = stageMachine.stage;
 let lastFrameMs = performance.now();
@@ -80,20 +83,30 @@ async function begin(): Promise<void> {
 
   await Promise.all([initHandLandmarker(), initSegmenter()]);
 
-  arScene.attachVideo(videoEl, camera.currentFacing === 'user');
+  applyVideoMetrics();
   permissionGate.classList.add('hidden');
 
   requestAnimationFrame(loop);
+}
+
+/** Sync the DOM video mirror class and the scene's anchor metrics to the current camera. */
+function applyVideoMetrics(): void {
+  const mirror = camera.currentFacing === 'user';
+  videoEl.classList.toggle('mirrored', mirror);
+  const aspect = videoEl.videoWidth && videoEl.videoHeight ? videoEl.videoWidth / videoEl.videoHeight : 16 / 9;
+  arScene.setVideoMetrics(aspect, mirror);
 }
 
 permissionButton.addEventListener('click', () => {
   begin().catch((err) => console.error(err));
 });
 
+videoEl.addEventListener('loadedmetadata', applyVideoMetrics);
+
 cameraToggleButton.addEventListener('click', () => {
   camera
     .toggleFacing()
-    .then(() => arScene.updateVideoAspect(videoEl, camera.currentFacing === 'user'))
+    .then(applyVideoMetrics)
     .catch((err) => console.error(err));
 });
 
@@ -241,10 +254,14 @@ function loop(nowMs: number): void {
     maturity = state.maturity;
     pouredOut = growthEngine.pouredOut;
 
-    const map = arScene.getMapping();
-    roots?.update(primaryRaw, map, maturity);
-    stem?.update(hand, map, maturity, state.wiltAmount, nowMs / 1000);
-    if (currentDna) petals?.update(currentDna, state, hand, map, nowMs / 1000, dtSeconds);
+    const ctx = arScene.anchorContext();
+    if (primaryRaw) {
+      landmarkToWorld(primaryRaw[9]!, ctx, originWorld);
+      handScale = Math.max(0.03, landmarkSpan(primaryRaw[0]!, primaryRaw[9]!, ctx));
+    }
+    roots?.update(primaryRaw, ctx, maturity);
+    stem?.update(originWorld, handScale, hand.present, maturity, state.wiltAmount, nowMs / 1000);
+    if (currentDna) petals?.update(currentDna, state, originWorld, handScale, hand.present, nowMs / 1000, dtSeconds);
   }
 
   if (revealStartMs !== null) {
