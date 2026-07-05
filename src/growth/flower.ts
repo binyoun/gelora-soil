@@ -43,7 +43,7 @@ interface PetalParam {
  */
 export class Flower {
   readonly group: THREE.Group;
-  readonly particles: THREE.Points;
+  readonly particles: THREE.InstancedMesh;
 
   private petals: PetalParam[] = [];
   private center: THREE.Mesh<THREE.CircleGeometry, THREE.MeshStandardMaterial>;
@@ -51,11 +51,13 @@ export class Flower {
   private mat: THREE.MeshStandardMaterial;
   private glitch: GlitchUniforms;
 
-  private particlePositions: Float32Array;
+  private particlePos: Float32Array;
   private particleVelocities: Float32Array;
   private particleAges: Float32Array;
-  private particleGeometry: THREE.BufferGeometry;
-  private particleMaterial: THREE.PointsMaterial;
+  private particleSize: Float32Array;
+  private particleAlphaAttr: THREE.InstancedBufferAttribute;
+  private particleMaterial: THREE.ShaderMaterial;
+  private particleDummy = new THREE.Object3D();
   private nextParticle = 0;
   private wasDetached: boolean[];
 
@@ -117,14 +119,51 @@ export class Flower {
     this.group.visible = false;
 
     this.wasDetached = new Array(this.petals.length).fill(false);
-    this.particlePositions = new Float32Array(MAX_PARTICLES * 3);
+    this.particlePos = new Float32Array(MAX_PARTICLES * 3);
     this.particleVelocities = new Float32Array(MAX_PARTICLES * 3);
     this.particleAges = new Float32Array(MAX_PARTICLES).fill(Infinity);
-    this.particleGeometry = new THREE.BufferGeometry();
-    this.particleGeometry.setAttribute('position', new THREE.BufferAttribute(this.particlePositions, 3));
-    this.particleMaterial = new THREE.PointsMaterial({ color: tintColor, size: 0.01, transparent: true, opacity: 0.8 });
-    this.particles = new THREE.Points(this.particleGeometry, this.particleMaterial);
+    this.particleSize = new Float32Array(MAX_PARTICLES);
+
+    // soft glowing billboard quads (additive) that fade like droplets of light,
+    // instead of hard square points. Real triangles, so no gl_PointSize limits.
+    const quad = new THREE.PlaneGeometry(1, 1);
+    this.particleAlphaAttr = new THREE.InstancedBufferAttribute(new Float32Array(MAX_PARTICLES), 1);
+    quad.setAttribute('aAlpha', this.particleAlphaAttr);
+    this.particleMaterial = new THREE.ShaderMaterial({
+      uniforms: { uColor: { value: tintColor.clone() } },
+      vertexShader: `
+        attribute float aAlpha;
+        varying vec2 vUv;
+        varying float vAlpha;
+        void main() {
+          vUv = uv;
+          vAlpha = aAlpha;
+          gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        precision mediump float;
+        uniform vec3 uColor;
+        varying vec2 vUv;
+        varying float vAlpha;
+        void main() {
+          float d = length(vUv - 0.5);
+          float glow = smoothstep(0.5, 0.0, d);
+          vec3 col = mix(uColor, vec3(1.0), glow * glow * 0.7);
+          gl_FragColor = vec4(col, glow * vAlpha);
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    this.particles = new THREE.InstancedMesh(quad, this.particleMaterial, MAX_PARTICLES);
     this.particles.frustumCulled = false;
+    this.particles.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    // start all hidden (zero scale)
+    this.particleDummy.scale.setScalar(0);
+    this.particleDummy.updateMatrix();
+    for (let i = 0; i < MAX_PARTICLES; i++) this.particles.setMatrixAt(i, this.particleDummy.matrix);
   }
 
   update(
@@ -199,36 +238,59 @@ export class Flower {
   }
 
   private spawnBurst(origin: THREE.Vector3, handScale: number): void {
-    for (let k = 0; k < 12; k++) {
+    for (let k = 0; k < 18; k++) {
       const idx = this.nextParticle;
       this.nextParticle = (this.nextParticle + 1) % MAX_PARTICLES;
-      this.particlePositions[idx * 3] = origin.x + (Math.random() - 0.5) * handScale;
-      this.particlePositions[idx * 3 + 1] = origin.y + (Math.random() - 0.5) * handScale;
-      this.particlePositions[idx * 3 + 2] = origin.z;
-      this.particleVelocities[idx * 3] = (Math.random() - 0.5) * 0.16;
-      this.particleVelocities[idx * 3 + 1] = Math.random() * 0.08;
-      this.particleVelocities[idx * 3 + 2] = (Math.random() - 0.5) * 0.1;
+      this.particlePos[idx * 3] = origin.x + (Math.random() - 0.5) * handScale;
+      this.particlePos[idx * 3 + 1] = origin.y + (Math.random() - 0.5) * handScale;
+      this.particlePos[idx * 3 + 2] = origin.z + (Math.random() - 0.5) * handScale * 0.5;
+      // gentle spill: soft outward drift, then gravity carries it down like water
+      this.particleVelocities[idx * 3] = (Math.random() - 0.5) * 0.1;
+      this.particleVelocities[idx * 3 + 1] = Math.random() * 0.04;
+      this.particleVelocities[idx * 3 + 2] = (Math.random() - 0.5) * 0.06;
       this.particleAges[idx] = 0;
+      this.particleSize[idx] = handScale * (0.32 + Math.random() * 0.4); // world-space glow radius
     }
   }
 
   private updateParticles(dt: number): void {
-    const positions = this.particleGeometry.attributes.position as THREE.BufferAttribute;
     let anyAlive = false;
     for (let i = 0; i < MAX_PARTICLES; i++) {
       if (this.particleAges[i]! === Infinity) continue;
       this.particleAges[i]! += dt;
-      if (this.particleAges[i]! > PARTICLE_LIFETIME_S) {
+      const age = this.particleAges[i]!;
+      if (age > PARTICLE_LIFETIME_S) {
         this.particleAges[i] = Infinity;
+        this.particleAlphaAttr.setX(i, 0);
+        this.particleDummy.scale.setScalar(0);
+        this.particleDummy.position.set(0, 0, 0);
+        this.particleDummy.updateMatrix();
+        this.particles.setMatrixAt(i, this.particleDummy.matrix);
+        anyAlive = true;
         continue;
       }
       anyAlive = true;
-      this.particleVelocities[i * 3 + 1]! -= 9.8 * dt * 0.05;
-      this.particlePositions[i * 3]! += this.particleVelocities[i * 3]! * dt;
-      this.particlePositions[i * 3 + 1]! += this.particleVelocities[i * 3 + 1]! * dt;
-      this.particlePositions[i * 3 + 2]! += this.particleVelocities[i * 3 + 2]! * dt;
+      this.particleVelocities[i * 3 + 1]! -= 9.8 * dt * 0.04; // gravity, fluid fall
+      this.particleVelocities[i * 3]! *= 0.98; // drag, so it flows rather than shoots
+      this.particleVelocities[i * 3 + 2]! *= 0.98;
+      this.particlePos[i * 3]! += this.particleVelocities[i * 3]! * dt;
+      this.particlePos[i * 3 + 1]! += this.particleVelocities[i * 3 + 1]! * dt;
+      this.particlePos[i * 3 + 2]! += this.particleVelocities[i * 3 + 2]! * dt;
+
+      // fade in fast, ebb out slowly (a droplet of light), swell slightly as it goes
+      const life = age / PARTICLE_LIFETIME_S;
+      this.particleAlphaAttr.setX(i, Math.min(1, age / 0.15) * (1 - life) * (1 - life));
+      const size = this.particleSize[i]! * (0.7 + life * 0.6);
+      this.particleDummy.position.set(this.particlePos[i * 3]!, this.particlePos[i * 3 + 1]!, this.particlePos[i * 3 + 2]!);
+      this.particleDummy.scale.setScalar(size);
+      this.particleDummy.rotation.set(0, 0, 0);
+      this.particleDummy.updateMatrix();
+      this.particles.setMatrixAt(i, this.particleDummy.matrix);
     }
-    if (anyAlive) positions.needsUpdate = true;
+    if (anyAlive) {
+      this.particles.instanceMatrix.needsUpdate = true;
+      this.particleAlphaAttr.needsUpdate = true;
+    }
   }
 
   dispose(): void {
@@ -237,7 +299,7 @@ export class Flower {
     this.center.geometry.dispose();
     this.stem.geometry.dispose();
     this.stem.material.dispose();
-    this.particleGeometry.dispose();
+    this.particles.geometry.dispose();
     this.particleMaterial.dispose();
   }
 }
