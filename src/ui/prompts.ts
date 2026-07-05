@@ -3,7 +3,7 @@ import type { Stage } from '../types';
 export function promptForStage(stage: Stage, opts: { handPresent: boolean; capturing: boolean }): string {
   switch (stage) {
     case 'CAPTURE':
-      return opts.capturing ? 'this is who you become' : 'turn to your reflection, pinch and hold';
+      return opts.capturing ? 'this is who you become' : 'get closer';
     case 'SOWING':
       return opts.handPresent ? 'hold your open palm still' : 'offer your open palm';
     case 'GROWING':

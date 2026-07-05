@@ -130,7 +130,7 @@ export class Flower {
     this.particleAlphaAttr = new THREE.InstancedBufferAttribute(new Float32Array(MAX_PARTICLES), 1);
     quad.setAttribute('aAlpha', this.particleAlphaAttr);
     this.particleMaterial = new THREE.ShaderMaterial({
-      uniforms: { uColor: { value: tintColor.clone() } },
+      uniforms: { uColor: { value: new THREE.Color(0x5cc4e8) } }, // water blue
       vertexShader: `
         attribute float aAlpha;
         varying vec2 vUv;
@@ -249,7 +249,7 @@ export class Flower {
       this.particleVelocities[idx * 3 + 1] = Math.random() * 0.04;
       this.particleVelocities[idx * 3 + 2] = (Math.random() - 0.5) * 0.06;
       this.particleAges[idx] = 0;
-      this.particleSize[idx] = handScale * (0.32 + Math.random() * 0.4); // world-space glow radius
+      this.particleSize[idx] = handScale * (0.2 + Math.random() * 0.26); // world-space glow radius (smaller)
     }
   }
 

@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { extractFlowerDNA } from './capture/dna';
 import { Camera } from './capture/camera';
 import { initSegmenter, segmentFrame } from './capture/segment';
-import { ShutterController } from './capture/shutter';
 import { buildHandState } from './hand/gestures';
 import { initHandLandmarker, detectHands } from './hand/landmarker';
 import { PalmStabilityTracker, type RawLandmark } from './hand/palm';
@@ -52,10 +51,11 @@ const EMPTY_HAND: HandState = {
   secondHandTip: null,
 };
 
+const AUTO_CAPTURE_SECONDS = 5; // selfie self-timer
+
 const camera = new Camera(videoEl);
 const arScene = new ARScene(sceneCanvas);
 const stageMachine = new StageMachine();
-const shutter = new ShutterController();
 const stabilityTracker = new PalmStabilityTracker();
 const promptUI = new PromptUI(promptEl);
 const fpsMonitor = new FpsMonitor();
@@ -72,6 +72,7 @@ let manualShutterTrigger = false;
 let restartRequested = false;
 let enteredEndedAtMs: number | null = null;
 let revealStartMs: number | null = null;
+let captureCountdownStartMs: number | null = null;
 const originWorld = new THREE.Vector3();
 let handScale = 0.15;
 let pixelRatioHalved = false;
@@ -197,8 +198,8 @@ function resetToCapture(): void {
   growthEngine = null;
   enteredEndedAtMs = null;
   revealStartMs = null;
+  captureCountdownStartMs = null;
   arScene.setRevealOpacity(0);
-  shutter.reset();
   stabilityTracker.reset();
 }
 
@@ -210,11 +211,12 @@ function updateStageUI(stage: string, isCapturing: boolean): void {
   stageGrowSection.classList.toggle('active', stage === 'ENDED');
 }
 
-/** Pinch-hold ring during capture; palm-position ring during the open-palm offer. */
-function updateRings(stage: string, primaryRaw: RawLandmark[] | null): void {
-  const pinch = stage === 'CAPTURE' && !capturing ? shutter.holdProgress : 0;
-  captureRing.style.opacity = pinch > 0.02 ? '1' : '0';
-  setRingProgress(captureRingProg, CAPTURE_RING_C, pinch);
+/** Countdown ring during the selfie self-timer; palm-position ring during the open-palm offer. */
+function updateRings(stage: string, primaryRaw: RawLandmark[] | null, nowMs: number): void {
+  const counting = stage === 'CAPTURE' && !capturing && captureCountdownStartMs !== null;
+  const progress = counting ? Math.min(1, (nowMs - captureCountdownStartMs!) / 1000 / AUTO_CAPTURE_SECONDS) : 0;
+  captureRing.style.opacity = counting ? '1' : '0';
+  setRingProgress(captureRingProg, CAPTURE_RING_C, progress);
 
   if (stage === 'SOWING' && primaryRaw) {
     const s = landmarkToScreen(primaryRaw[9]!, arScene.anchorContext());
@@ -256,13 +258,15 @@ function loop(nowMs: number): void {
   const mirror = camera.currentFacing === 'user';
 
   if (stageMachine.stage === 'CAPTURE' && !capturing) {
-    const pinchFired = shutter.update(primaryRaw, nowMs) || consumeManualTrigger();
-    if (pinchFired) {
-      const pinchPoint = primaryRaw
-        ? { x: (primaryRaw[4]!.x + primaryRaw[8]!.x) / 2, y: (primaryRaw[4]!.y + primaryRaw[8]!.y) / 2 }
-        : { x: 0.5, y: 0.5 };
-      runCapturePipeline(pinchPoint).catch((err) => console.error(err));
+    // selfie self-timer: auto-capture after the countdown, or immediately on tap
+    if (captureCountdownStartMs === null) captureCountdownStartMs = nowMs;
+    const elapsed = (nowMs - captureCountdownStartMs) / 1000;
+    const timedOut = elapsed >= AUTO_CAPTURE_SECONDS;
+    if (timedOut || consumeManualTrigger()) {
+      runCapturePipeline({ x: 0.5, y: 0.5 }).catch((err) => console.error(err)); // selfie is centered
     }
+  } else if (stageMachine.stage !== 'CAPTURE') {
+    captureCountdownStartMs = null;
   }
 
   let maturity = 0;
@@ -313,14 +317,20 @@ function loop(nowMs: number): void {
   }
 
   updateStageUI(stage, capturing);
-  updateRings(stage, primaryRaw);
+  updateRings(stage, primaryRaw, nowMs);
 
   if (stage === 'ENDED' && enteredEndedAtMs !== null && nowMs - enteredEndedAtMs > 1200) {
     if (flower) flower.group.visible = false;
     if (roots) roots.group.visible = false;
   }
 
-  promptUI.set(promptForStage(stage, { handPresent: hand.present, capturing }));
+  if (stage === 'CAPTURE' && !capturing && captureCountdownStartMs !== null) {
+    // "get closer" while there's time, then a 3..2..1 countdown before the selfie fires
+    const remaining = AUTO_CAPTURE_SECONDS - (nowMs - captureCountdownStartMs) / 1000;
+    promptUI.set(remaining > 3 ? 'get closer' : String(Math.max(1, Math.ceil(remaining))));
+  } else {
+    promptUI.set(promptForStage(stage, { handPresent: hand.present, capturing }));
+  }
 
   if (debugOverlay) {
     debugOverlay.resize(window.innerWidth, window.innerHeight);
