@@ -84,7 +84,7 @@ async function begin(): Promise<void> {
   // so they are ready the moment the gate lifts.
   stageCaptureSection.classList.add('active');
   try {
-    await camera.start('environment');
+    await camera.start('user'); // front camera: the selfie becomes the flower (narcissus)
   } catch (err) {
     console.error(err);
     permissionButton.disabled = false;

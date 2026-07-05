@@ -3,11 +3,11 @@ import type { Stage } from '../types';
 export function promptForStage(stage: Stage, opts: { handPresent: boolean; capturing: boolean }): string {
   switch (stage) {
     case 'CAPTURE':
-      return opts.capturing ? 'this is who will grow' : 'find a flower, pinch and hold to capture';
+      return opts.capturing ? 'this is who you become' : 'turn to your reflection, pinch and hold';
     case 'SOWING':
       return opts.handPresent ? 'hold your open palm still' : 'offer your open palm';
     case 'GROWING':
-      return opts.handPresent ? '' : 'stay with them';
+      return opts.handPresent ? '' : 'stay with yourself';
     case 'ENDED':
       return 'tap to begin again';
   }

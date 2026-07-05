@@ -1,21 +1,21 @@
-# gelora-soil
+# narcissus
 
-A real-time WebAR work in which a participant photographs a living flower, and that flower regenerates as a growing, mutating 3D being rooted in the participant's own palm.
+A real-time WebAR work in which a participant turns to their own reflection, and that reflection takes root as a growing, mutating 3D flower held in the participant's own palm.
 
-The body becomes the soil. Care, stillness, and duration are the interaction grammar.
+After Narcissus, who fell in love with his reflection and was turned into the flower. Care, stillness, and duration are the interaction grammar.
 
-The participant offers their open palm to the camera. Roots take hold across the skin. A flower they photographed moments earlier, a real flower from their surroundings, unfolds from the palm as a hybrid being: part scan, part procedural growth, mutating for as long as the hand sustains it. Closing the hand wilts them. Tilting the palm lets them fall. Nothing is stored: each being exists only in the duration of holding.
+The participant captures themselves with the front camera. Their portrait is mapped onto a blooming flower that unfolds from their open palm, its petals wearing their own image, mutating and glitching for as long as the hand sustains it. Closing the hand wilts it. Tilting the palm lets it fall. Nothing is stored: each bloom exists only in the duration of holding yourself.
 
-Part of the Gelora practice lineage. Gelora is referred to as they/them throughout.
+Part of the Gelora practice lineage.
 
 ## How it works
 
-1. Photograph a flower in your surroundings (pinch and hold, or use the fallback shutter button).
-2. Offer an open, still palm to the camera. Stillness is care: the more still the hand, the faster the being takes root.
-3. Watch roots, then a stem, then petals unfold from your palm, seeded entirely by the flower you photographed. No two captures grow the same being.
-4. Close your hand to let the being wilt; reopen to recover.
-5. Tilt your palm past horizontal to let the being pour out and fall.
-6. A second hand's fingertip can touch a petal directly to warp and permanently shift its hue: a mediated touch.
+1. Turn to your reflection in the front camera and pinch and hold (or use the fallback shutter button) to capture yourself.
+2. Offer an open, still palm to the camera. Stillness is care: the more still the hand, the faster the flower takes root.
+3. Watch a flower grow from your palm, its petals mapped from your own portrait, seeded entirely by the capture. No two are the same.
+4. Close your hand to let it wilt; reopen to recover.
+5. Tilt your palm to let it pour out and fall.
+6. A second hand can touch it to erupt it into glitch: a mediated touch.
 
 Nothing is stored, no accounts, no gallery. Camera frames never leave the device.
 

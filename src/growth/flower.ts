@@ -294,27 +294,41 @@ function buildPetalGeometry(
   return geo;
 }
 
-/** A curved, tapered stalk swept along a gentle bezier from the flower base (y=0) toward the hand (y=-1). */
+/**
+ * A thin, irregular, twisting organic tendril from the flower base (y=0) toward
+ * the hand (y=-1): a bezier spine with a tapering wiggle and a slow helical
+ * twist, and slightly uneven thickness, so it reads as alive rather than a tube.
+ */
 function buildStemGeometry(rand: () => number): THREE.BufferGeometry {
-  const N = 14;
-  const M = 7;
-  const bendX = (rand() - 0.5) * 0.3;
-  const bendZ = (rand() - 0.5) * 0.2;
-  const ctrl = new THREE.Vector3(bendX * 0.5 + (rand() - 0.5) * 0.15, -0.5, bendZ * 0.5);
+  const N = 22;
+  const M = 6;
+  const bendX = (rand() - 0.5) * 0.36;
+  const bendZ = (rand() - 0.5) * 0.24;
+  const ctrl = new THREE.Vector3(bendX * 0.5 + (rand() - 0.5) * 0.2, -0.5, bendZ * 0.5);
   const p0 = new THREE.Vector3(0, 0, 0);
   const p1 = new THREE.Vector3(bendX, -1, bendZ);
+
+  const wf1 = 6 + rand() * 5;
+  const wf2 = 8 + rand() * 6;
+  const wph1 = rand() * 6.28;
+  const wph2 = rand() * 6.28;
+  const wAmpX = 0.03 + rand() * 0.035;
+  const wAmpZ = 0.03 + rand() * 0.035;
+  const twist = (rand() - 0.5) * 5;
 
   const positions: number[] = [];
   const indices: number[] = [];
   for (let i = 0; i <= N; i++) {
     const t = i / N;
     const mt = 1 - t;
-    const cx = mt * mt * p0.x + 2 * mt * t * ctrl.x + t * t * p1.x;
+    const env = Math.sin(Math.PI * t); // wiggle vanishes at both ends
+    const cx = mt * mt * p0.x + 2 * mt * t * ctrl.x + t * t * p1.x + Math.sin(t * wf1 + wph1) * wAmpX * env;
     const cy = mt * mt * p0.y + 2 * mt * t * ctrl.y + t * t * p1.y;
-    const cz = mt * mt * p0.z + 2 * mt * t * ctrl.z + t * t * p1.z;
-    const radius = 0.02 + t * 0.045; // thin at flower, thicker toward hand
+    const cz = mt * mt * p0.z + 2 * mt * t * ctrl.z + t * t * p1.z + Math.cos(t * wf2 + wph2) * wAmpZ * env;
+    const radius = (0.014 + t * 0.03) * (0.82 + Math.abs(Math.sin(t * 9 + wph1)) * 0.36); // thin at flower, uneven
+    const tw = twist * t;
     for (let m = 0; m <= M; m++) {
-      const ang = (m / M) * Math.PI * 2;
+      const ang = (m / M) * Math.PI * 2 + tw;
       positions.push(cx + Math.cos(ang) * radius, cy, cz + Math.sin(ang) * radius);
     }
   }

@@ -3,7 +3,7 @@ export type FacingMode = 'environment' | 'user';
 export class Camera {
   readonly video: HTMLVideoElement;
   private stream: MediaStream | null = null;
-  private facing: FacingMode = 'environment';
+  private facing: FacingMode = 'user';
 
   constructor(video: HTMLVideoElement) {
     this.video = video;
