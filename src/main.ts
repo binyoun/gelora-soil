@@ -21,10 +21,8 @@ const debugCanvas = document.getElementById('debug-overlay') as HTMLCanvasElemen
 const permissionGate = document.getElementById('permission-gate')!;
 const permissionButton = document.getElementById('permission-request') as HTMLButtonElement;
 const stageCaptureSection = document.getElementById('stage-capture')!;
-const stageGrowSection = document.getElementById('stage-grow')!;
 const cameraToggleButton = document.getElementById('camera-toggle') as HTMLButtonElement;
 const shutterFallbackButton = document.getElementById('shutter-fallback') as HTMLButtonElement;
-const restartButton = document.getElementById('restart-button') as HTMLButtonElement;
 const promptEl = document.getElementById('prompt')!;
 const captureRing = document.getElementById('capture-ring') as unknown as SVGSVGElement;
 const captureRingProg = captureRing.querySelector('.prog') as SVGCircleElement;
@@ -126,8 +124,9 @@ shutterFallbackButton.addEventListener('click', () => {
   manualShutterTrigger = true;
 });
 
-restartButton.addEventListener('click', () => {
-  restartRequested = true;
+// Tap anywhere to begin again once the being has ended (no button, just the prompt).
+window.addEventListener('pointerdown', () => {
+  if (stageMachine.stage === 'ENDED') restartRequested = true;
 });
 
 function freezeFrame(): HTMLCanvasElement {
@@ -208,7 +207,6 @@ function resetToCapture(): void {
     the restart affordance shows only in ENDED. */
 function updateStageUI(stage: string, isCapturing: boolean): void {
   stageCaptureSection.classList.toggle('active', stage === 'CAPTURE' && !isCapturing);
-  stageGrowSection.classList.toggle('active', stage === 'ENDED');
 }
 
 /** Countdown ring during the selfie self-timer; palm-position ring during the open-palm offer. */
