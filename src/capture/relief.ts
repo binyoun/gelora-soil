@@ -35,12 +35,19 @@ export function buildRelief(matted: HTMLCanvasElement): Relief {
   const interior = mask;
   for (let p = 0; p < BLUR_PASSES; p++) boxBlur(interior, RES, RES, BLUR_RADIUS);
 
-  let max = 1e-6;
+  // interior domes the shape; luminance adds gentle, mostly-smooth relief
   const height = new Float32Array(RES * RES);
   for (let i = 0; i < RES * RES; i++) {
-    const h = interior[i]! * (0.4 + 0.6 * lum[i]!);
-    height[i] = h;
-    if (h > max) max = h;
+    height[i] = interior[i]! * (0.65 + 0.35 * lum[i]!);
+  }
+  // smooth the combined relief so surface normals read as a form, not per-pixel
+  // noise (raw per-pixel luminance detail is what looked like "pixel dropping")
+  boxBlur(height, RES, RES, 4);
+  boxBlur(height, RES, RES, 4);
+
+  let max = 1e-6;
+  for (let i = 0; i < RES * RES; i++) {
+    if (height[i]! > max) max = height[i]!;
   }
 
   const pixels = new Uint8Array(RES * RES * 4);

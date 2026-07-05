@@ -91,12 +91,10 @@ export class Bloom {
     // scalars derived from the per-petal growth state
     let hueSum = 0;
     let warpSum = 0;
-    let maxWarp = 0;
     let detached = 0;
     for (const p of growth.petals) {
       hueSum += p.hueShift;
       warpSum += p.warp;
-      maxWarp = Math.max(maxWarp, p.warp);
       if (p.detached) detached++;
     }
     const n = Math.max(1, growth.petals.length);
@@ -106,9 +104,11 @@ export class Bloom {
     u.uWarp!.value = warpSum / n;
     u.uPour!.value = detachedRatio;
 
+    // glitch is an accent that fires on a mediated-touch mutation, then decays.
+    // Not a constant baseline (that read as flickering "pixel dropping").
     const lastTouchAge = growth.mutations.length ? growth.age - growth.mutations[growth.mutations.length - 1]!.at : 999;
-    const touchSurge = Math.max(0, 1 - lastTouchAge / 0.6);
-    u.uGlitch!.value = Math.min(1, 0.1 + maxWarp * 0.5 + touchSurge * 0.8) * smoothstep(0.1, 0.4, growth.maturity);
+    const touchSurge = Math.max(0, 1 - lastTouchAge / 0.8);
+    u.uGlitch!.value = Math.min(0.9, touchSurge * 0.9) * smoothstep(0.1, 0.4, growth.maturity);
 
     const unfold = smoothstep(0.1, 0.6, growth.maturity);
     u.uUnfold!.value = unfold;

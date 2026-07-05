@@ -33,12 +33,18 @@ export function pinchDistance(landmarks: RawLandmark[]): number {
   return distance(landmarks[4]!, landmarks[8]!);
 }
 
-/** Angle in degrees between the palm normal and the camera-facing axis. */
+/**
+ * How far the palm has tilted away from facing the camera, 0 (flat toward
+ * camera) to 90 (edge-on). The palm normal's sign is ambiguous (it flips with
+ * hand chirality and landmark order), so a flat palm can read as ~0 or ~180;
+ * we fold to 0..90 so a flat palm is always ~0 and pour never triggers falsely.
+ */
 export function computeTilt(landmarks: RawLandmark[]): number {
   const normal = palmNormal(landmarks);
   const dotV = normal.x * CAMERA_AXIS.x + normal.y * CAMERA_AXIS.y + normal.z * CAMERA_AXIS.z;
   const clamped = Math.max(-1, Math.min(1, dotV));
-  return (Math.acos(clamped) * 180) / Math.PI;
+  const angle = (Math.acos(clamped) * 180) / Math.PI; // 0..180
+  return angle > 90 ? 180 - angle : angle; // fold to 0..90, orientation-agnostic
 }
 
 export function secondHandTip(landmarks: RawLandmark[] | null): Vec3 | null {

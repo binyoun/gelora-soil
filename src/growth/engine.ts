@@ -103,7 +103,7 @@ export class GrowthEngine {
     const s = this.state;
     const over = hand.tilt > POUR_TILT_THRESHOLD_DEG;
     if (over) {
-      const overTilt = (hand.tilt - POUR_TILT_THRESHOLD_DEG) / (180 - POUR_TILT_THRESHOLD_DEG);
+      const overTilt = (hand.tilt - POUR_TILT_THRESHOLD_DEG) / (90 - POUR_TILT_THRESHOLD_DEG);
       const detachChance = POUR_DETACH_RATE * clamp01(overTilt) * dt;
       for (const petal of s.petals) {
         if (!petal.detached && this.mutation.randomFloat() < detachChance) {
