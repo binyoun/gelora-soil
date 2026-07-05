@@ -10,6 +10,7 @@ export class ARScene {
   readonly overlayGroup: THREE.Group;
 
   private backgroundPlane: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
+  private revealPlane: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
   private videoTexture: THREE.VideoTexture | null = null;
   private mapping: AnchorMapping;
   private lastVideoAspect = 16 / 9;
@@ -32,6 +33,14 @@ export class ARScene {
     this.backgroundPlane = new THREE.Mesh(geometry, material);
     this.backgroundPlane.position.z = -PLANE_DISTANCE;
     this.scene.add(this.backgroundPlane);
+
+    // "this is who will grow": the captured flower floated in front of the feed
+    // for a moment after capture, then fading as the being takes root.
+    const revealMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+    this.revealPlane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), revealMat);
+    this.revealPlane.position.z = -1.2;
+    this.revealPlane.visible = false;
+    this.scene.add(this.revealPlane);
 
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0x1a1005, 1.2));
     const key = new THREE.DirectionalLight(0xffffff, 0.6);
@@ -56,6 +65,24 @@ export class ARScene {
     this.backgroundPlane.material.color.setHex(0xffffff);
     this.backgroundPlane.material.needsUpdate = true;
     this.updateVideoAspect(video, mirrorX);
+  }
+
+  beginReveal(texture: THREE.Texture, captureAspect: number): void {
+    this.revealPlane.material.map = texture;
+    this.revealPlane.material.needsUpdate = true;
+    // Fit the longer side to a fraction of the view so it never overflows a
+    // narrow portrait phone screen, preserving the capture's aspect.
+    const maxSide = 0.55;
+    const w = captureAspect >= 1 ? maxSide : maxSide * captureAspect;
+    const h = captureAspect >= 1 ? maxSide / captureAspect : maxSide;
+    this.revealPlane.scale.set(w, h, 1);
+    this.revealPlane.material.opacity = 1;
+    this.revealPlane.visible = true;
+  }
+
+  setRevealOpacity(opacity: number): void {
+    this.revealPlane.material.opacity = opacity;
+    this.revealPlane.visible = opacity > 0.001;
   }
 
   updateVideoAspect(video: HTMLVideoElement, mirrorX: boolean): void {

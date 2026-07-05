@@ -12,8 +12,12 @@
 
     #app { position: fixed; inset: 0; }
 
-    section { position: absolute; inset: 0; display: none; }
+    /* Stage sections are transparent overlays for stage-specific controls only.
+       pointer-events pass through the section itself so it never blocks the
+       persistent AR layer; the controls inside re-enable their own events. */
+    section { position: absolute; inset: 0; display: none; pointer-events: none; }
     section.active { display: block; }
+    section button { pointer-events: auto; }
 
     canvas#scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
     /* Kept in the render tree (not display:none) so it keeps decoding frames on
@@ -80,13 +84,16 @@
       </div>
     </div>
 
+    <!-- Persistent AR layer, shared by every stage. Kept outside the stage
+         sections so switching stages never hides the render surface. -->
+    <video id="camera-feed" autoplay playsinline muted></video>
+    <canvas id="scene"></canvas>
+    <canvas id="debug-overlay"></canvas>
+    <div id="prompt"></div>
+
     <section id="stage-capture">
-      <video id="camera-feed" autoplay playsinline muted></video>
-      <canvas id="scene"></canvas>
-      <canvas id="debug-overlay"></canvas>
       <button id="camera-toggle" aria-label="toggle camera">flip</button>
       <button id="shutter-fallback" aria-label="capture flower"></button>
-      <div id="prompt"></div>
     </section>
 
     <section id="stage-grow">

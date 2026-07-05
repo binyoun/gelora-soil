@@ -59,15 +59,15 @@ let capturing = false;
 let manualShutterTrigger = false;
 let restartRequested = false;
 let enteredEndedAtMs: number | null = null;
+let revealStartMs: number | null = null;
 let pixelRatioHalved = false;
 let prevStage = stageMachine.stage;
 let lastFrameMs = performance.now();
 
 async function begin(): Promise<void> {
   permissionButton.disabled = true;
-  // Make the capture stage active (still hidden behind the opaque permission
-  // gate) before starting the camera, so video.play() is never called while an
-  // ancestor is display:none, which iOS Safari can reject.
+  // Show the capture controls (still hidden behind the opaque permission gate)
+  // so they are ready the moment the gate lifts.
   stageCaptureSection.classList.add('active');
   try {
     await camera.start('environment');
@@ -155,6 +155,9 @@ async function runCapturePipeline(pinchPoint: { x: number; y: number }): Promise
   petals.setTexture(captureTexture);
   arScene.overlayGroup.add(stem.mesh, roots.group, petals.instancedMesh, petals.particles);
 
+  arScene.beginReveal(captureTexture, matted.width / matted.height);
+  revealStartMs = performance.now();
+
   await wait(1500);
 
   capturing = false;
@@ -166,8 +169,7 @@ async function runCapturePipeline(pinchPoint: { x: number; y: number }): Promise
     timestampMs: performance.now(),
     restartRequested: false,
   });
-  stageCaptureSection.classList.remove('active');
-  stageGrowSection.classList.add('active');
+  // Stage-section visibility is driven every frame by updateStageUI in the loop.
 }
 
 function resetToCapture(): void {
@@ -177,10 +179,18 @@ function resetToCapture(): void {
   currentDna = null;
   growthEngine = null;
   enteredEndedAtMs = null;
+  revealStartMs = null;
+  arScene.setRevealOpacity(0);
   shutter.reset();
   stabilityTracker.reset();
-  stageGrowSection.classList.remove('active');
-  stageCaptureSection.classList.add('active');
+}
+
+/** Stage sections hold only stage-specific controls; the render layer is persistent.
+    Capture controls show only in CAPTURE (and not during the post-shutter reveal);
+    the restart affordance shows only in ENDED. */
+function updateStageUI(stage: string, isCapturing: boolean): void {
+  stageCaptureSection.classList.toggle('active', stage === 'CAPTURE' && !isCapturing);
+  stageGrowSection.classList.toggle('active', stage === 'ENDED');
 }
 
 function consumeManualTrigger(): boolean {
@@ -237,6 +247,16 @@ function loop(nowMs: number): void {
     if (currentDna) petals?.update(currentDna, state, hand, map, nowMs / 1000, dtSeconds);
   }
 
+  if (revealStartMs !== null) {
+    const revealAge = nowMs - revealStartMs;
+    // hold for 1.2s, then fade out by 2.5s, and hand off early once the being has taken root
+    let opacity = revealAge < 1200 ? 1 : 1 - (revealAge - 1200) / 1300;
+    if (maturity > 0.1) opacity = Math.min(opacity, 1 - maturity / 0.1);
+    opacity = Math.max(0, Math.min(1, opacity));
+    arScene.setRevealOpacity(opacity);
+    if (opacity <= 0.001) revealStartMs = null;
+  }
+
   const stage = stageMachine.update({
     shutterFired: false,
     hand,
@@ -252,6 +272,8 @@ function loop(nowMs: number): void {
     if (stage === 'CAPTURE' && prevStage === 'ENDED') resetToCapture();
     prevStage = stage;
   }
+
+  updateStageUI(stage, capturing);
 
   if (stage === 'ENDED' && enteredEndedAtMs !== null && nowMs - enteredEndedAtMs > 1000) {
     if (stem) stem.mesh.visible = false;
