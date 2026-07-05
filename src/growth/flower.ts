@@ -178,9 +178,9 @@ export class Flower {
     // glitch: a small living baseline once bloomed, spiking hard and lingering on
     // a mediated-touch mutation
     const lastTouchAge = growth.mutations.length ? growth.age - growth.mutations[growth.mutations.length - 1]!.at : 999;
-    const touchSurge = Math.max(0, 1 - lastTouchAge / 1.2);
+    const touchSurge = Math.max(0, 1 - lastTouchAge / 1.6);
     const base = 0.08 * smoothstep(0.25, 0.55, growth.maturity);
-    this.glitch.uGlitch.value = Math.min(1, base + touchSurge * 1.1);
+    this.glitch.uGlitch.value = Math.min(1, base + touchSurge * 1.5);
     this.glitch.uTime.value = time;
 
     if (!present || growth.maturity <= 0.04) {
@@ -197,7 +197,7 @@ export class Flower {
     const lift = handScale * LIFT_PER_HAND * emerge;
 
     // touch glitch also jitters the whole head slightly, for a stronger hit
-    const jitterAmp = touchSurge * handScale * 0.05;
+    const jitterAmp = touchSurge * handScale * 0.1;
     this.group.position.set(
       originWorld.x + (Math.random() - 0.5) * jitterAmp,
       originWorld.y + lift + (Math.random() - 0.5) * jitterAmp,

@@ -51,7 +51,7 @@ const EMPTY_HAND: HandState = {
   secondHandTip: null,
 };
 
-const AUTO_CAPTURE_SECONDS = 5; // selfie self-timer
+const AUTO_CAPTURE_SECONDS = 3; // selfie self-timer
 
 const camera = new Camera(videoEl);
 const arScene = new ARScene(sceneCanvas);
@@ -325,9 +325,9 @@ function loop(nowMs: number): void {
   }
 
   if (stage === 'CAPTURE' && !capturing && captureCountdownStartMs !== null) {
-    // "get closer" while there's time, then a 3..2..1 countdown before the selfie fires
+    // "get closer" first, then a 2..1 countdown before the selfie fires
     const remaining = AUTO_CAPTURE_SECONDS - (nowMs - captureCountdownStartMs) / 1000;
-    promptUI.set(remaining > 3 ? 'get closer' : String(Math.max(1, Math.ceil(remaining))));
+    promptUI.set(remaining > 2 ? 'get closer' : String(Math.max(1, Math.ceil(remaining))));
   } else {
     promptUI.set(promptForStage(stage, { handPresent: hand.present, capturing }));
   }
