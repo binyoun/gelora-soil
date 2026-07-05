@@ -50,6 +50,10 @@ export class ARScene {
     this.videoTexture = new THREE.VideoTexture(video);
     this.videoTexture.colorSpace = THREE.SRGBColorSpace;
     this.backgroundPlane.material.map = this.videoTexture;
+    // MeshBasicMaterial renders as map * color; the base color starts black so
+    // the plane is dark before the feed loads. Once the video map is attached,
+    // reset to white or every frame is multiplied to black.
+    this.backgroundPlane.material.color.setHex(0xffffff);
     this.backgroundPlane.material.needsUpdate = true;
     this.updateVideoAspect(video, mirrorX);
   }

@@ -16,7 +16,14 @@
     section.active { display: block; }
 
     canvas#scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-    video#camera-feed { display: none; }
+    /* Kept in the render tree (not display:none) so it keeps decoding frames on
+       iOS Safari; drawn only via the Three.js VideoTexture, so hide it behind
+       the canvas rather than removing it. */
+    video#camera-feed {
+      position: absolute; top: 0; left: 0;
+      width: 2px; height: 2px; opacity: 0.01;
+      pointer-events: none; z-index: -1;
+    }
 
     canvas#debug-overlay {
       position: absolute; inset: 0; width: 100%; height: 100%;

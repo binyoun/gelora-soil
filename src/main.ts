@@ -65,6 +65,10 @@ let lastFrameMs = performance.now();
 
 async function begin(): Promise<void> {
   permissionButton.disabled = true;
+  // Make the capture stage active (still hidden behind the opaque permission
+  // gate) before starting the camera, so video.play() is never called while an
+  // ancestor is display:none, which iOS Safari can reject.
+  stageCaptureSection.classList.add('active');
   try {
     await camera.start('environment');
   } catch (err) {
@@ -78,7 +82,6 @@ async function begin(): Promise<void> {
 
   arScene.attachVideo(videoEl, camera.currentFacing === 'user');
   permissionGate.classList.add('hidden');
-  stageCaptureSection.classList.add('active');
 
   requestAnimationFrame(loop);
 }
