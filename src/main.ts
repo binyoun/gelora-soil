@@ -169,7 +169,7 @@ async function runCapturePipeline(pinchPoint: { x: number; y: number }): Promise
   disposeGrowthVisuals();
   growthEngine = new GrowthEngine(dna);
   roots = new Roots();
-  flower = new Flower(dna);
+  flower = new Flower(dna, captureTexture);
   arScene.overlayGroup.add(roots.group, flower.group, flower.particles);
 
   arScene.beginReveal(captureTexture, matted.width / matted.height);

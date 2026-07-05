@@ -1,40 +1,44 @@
 import * as THREE from 'three';
 import type { FlowerDNA, GrowthState } from '../types';
+import { mulberry32 } from '../util/rng';
 import { patchGlitch, type GlitchUniforms } from './glitchMaterial';
 
 const MAX_PETALS = 16;
-const PETAL_LEN_PER_HAND = 1.25; // petal length as a multiple of hand span
-const LIFT_PER_HAND = 1.5; // flower head height above the palm
+const PETAL_LEN_PER_HAND = 2.0; // petal length as a multiple of hand span (bigger)
+const LIFT_PER_HAND = 1.8; // flower head height above the palm
 const MAX_PARTICLES = 300;
 const PARTICLE_LIFETIME_S = 2.4;
 
 const DEG = Math.PI / 180;
 
+interface PetalParam {
+  mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>;
+  angle: number;
+  layer: number;
+  scale: number;
+  tiltBias: number;
+  swayPhase: number;
+}
+
 /**
- * A DNA-driven procedural flower: real curved petal geometry (not flat planes),
- * layered rings, a domed center, and a stem, all MeshStandardMaterial lit by the
- * scene environment (PMREM). FlowerDNA sets petal count, shape, colour and size.
- * Grows open + scales with maturity, droops with wilt, sheds petals on pour, and
- * glitches its own surface (uncanny-garden ModelGlitch idiom) on mutation.
+ * A DNA-driven flower model that wears the captured flower photo: each petal is
+ * its own curved, slightly irregular mesh whose UVs sample a radial wedge of the
+ * photo, so the assembled bloom reconstructs the real flower's image in 3D.
+ * MeshStandardMaterial lit by the scene environment (PMREM). FlowerDNA drives
+ * petal count, shape, size and organic variation. Grows open + scales with
+ * maturity, droops with wilt, sheds petals on pour, glitches on mutation.
  */
 export class Flower {
   readonly group: THREE.Group;
   readonly particles: THREE.Points;
 
-  private petals: THREE.InstancedMesh;
-  private center: THREE.Mesh<THREE.SphereGeometry, THREE.MeshStandardMaterial>;
+  private petals: PetalParam[] = [];
+  private center: THREE.Mesh<THREE.CircleGeometry, THREE.MeshStandardMaterial>;
   private stem: THREE.Mesh<THREE.CylinderGeometry, THREE.MeshStandardMaterial>;
-  private petalMat: THREE.MeshStandardMaterial;
+  private mat: THREE.MeshStandardMaterial;
   private glitch: GlitchUniforms;
-  private dummy = new THREE.Object3D();
 
   private petalCount: number;
-  private baseHue: number;
-  private baseSat: number;
-  private layerOf: number[] = [];
-  private idxInLayer: number[] = [];
-  private layerSize: number[] = [];
-  private jitter: number[] = [];
 
   private particlePositions: Float32Array;
   private particleVelocities: Float32Array;
@@ -44,49 +48,63 @@ export class Flower {
   private nextParticle = 0;
   private wasDetached: boolean[];
 
-  constructor(dna: FlowerDNA) {
+  constructor(dna: FlowerDNA, photo: THREE.Texture) {
     this.group = new THREE.Group();
     this.petalCount = Math.max(5, Math.min(MAX_PETALS, dna.petalCount));
-    this.baseHue = dna.hueCenter / 360;
-    this.baseSat = Math.max(0.45, Math.min(0.95, dna.saturation));
+    const rand = mulberry32(dna.seed);
+    const tintColor = new THREE.Color().setHSL(dna.hueCenter / 360, Math.max(0.4, dna.saturation), 0.55);
 
-    const baseColor = new THREE.Color().setHSL(this.baseHue, this.baseSat, 0.55);
-
-    const petalGeo = buildPetalGeometry(dna.edgeComplexity);
-    this.petalMat = new THREE.MeshStandardMaterial({
-      color: baseColor,
-      roughness: 0.5,
+    // one shared material: the captured flower photo, lit by the environment
+    this.mat = new THREE.MeshStandardMaterial({
+      map: photo,
+      color: 0xffffff,
+      roughness: 0.62,
       metalness: 0.0,
       side: THREE.DoubleSide,
-      envMapIntensity: 0.9,
+      envMapIntensity: 0.85,
+      // discard where the photo has no flower (matte alpha), so petals that
+      // sample past the flower are cleanly cut, not black; gives ragged organic tips
+      alphaTest: 0.35,
     });
-    this.glitch = patchGlitch(this.petalMat, baseColor.getHex(), 0.06);
-    this.petals = new THREE.InstancedMesh(petalGeo, this.petalMat, MAX_PETALS);
-    this.petals.count = this.petalCount;
-    this.petals.frustumCulled = false;
-    this.group.add(this.petals);
+    this.glitch = patchGlitch(this.mat, tintColor.getHex(), 0.06);
 
-    // two layers for fuller flowers so petals overlap instead of splaying flat
     const outer = this.petalCount <= 8 ? this.petalCount : Math.ceil(this.petalCount * 0.62);
     const inner = this.petalCount - outer;
+    const sharp = 0.5 + dna.edgeComplexity * 1.4;
+
     for (let i = 0; i < this.petalCount; i++) {
       const isOuter = i < outer;
-      this.layerOf.push(isOuter ? 0 : 1);
-      this.idxInLayer.push(isOuter ? i : i - outer);
-      this.layerSize.push(isOuter ? outer : Math.max(1, inner));
-      this.jitter.push((((dna.seed >> (i % 24)) & 0xff) / 255 - 0.5) * 0.18);
+      const layer = isOuter ? 0 : 1;
+      const count = isOuter ? outer : Math.max(1, inner);
+      const idx = isOuter ? i : i - outer;
+      const jitter = (rand() - 0.5) * 0.22; // organic angular jitter
+      const angle = (idx / count) * Math.PI * 2 + (layer === 1 ? Math.PI / count : 0) + jitter;
+      const wedge = (Math.PI * 2) / count * 1.15;
+      const rMax = layer === 1 ? 0.3 : 0.42;
+
+      const geo = buildPetalGeometry(sharp, angle, wedge, rMax, rand);
+      const mesh = new THREE.Mesh(geo, this.mat);
+      mesh.frustumCulled = false;
+      this.group.add(mesh);
+      this.petals.push({
+        mesh,
+        angle,
+        layer,
+        scale: (layer === 1 ? 0.72 : 1) * (0.9 + rand() * 0.25), // organic size variance
+        tiltBias: (layer === 1 ? 20 : 0) * DEG + (rand() - 0.5) * 16 * DEG,
+        swayPhase: rand() * Math.PI * 2,
+      });
     }
 
-    const centerColor = new THREE.Color().setHSL((this.baseHue + 0.5) % 1, 0.5, 0.5);
-    this.center = new THREE.Mesh(
-      new THREE.SphereGeometry(0.18, 22, 16),
-      new THREE.MeshStandardMaterial({ color: centerColor, roughness: 0.65, metalness: 0.0 }),
-    );
-    this.center.scale.set(1, 1, 0.6);
+    // center: a small disc of the photo's middle, hiding where petals converge
+    const centerGeo = new THREE.CircleGeometry(1, 28);
+    remapCircleUvToPhotoCenter(centerGeo, 0.14);
+    this.center = new THREE.Mesh(centerGeo, this.mat);
+    this.center.frustumCulled = false;
     this.group.add(this.center);
 
     const stemGeo = new THREE.CylinderGeometry(0.03, 0.05, 1, 7, 1, true);
-    stemGeo.translate(0, -0.5, 0); // top at y=0, extends down
+    stemGeo.translate(0, -0.5, 0);
     this.stem = new THREE.Mesh(
       stemGeo,
       new THREE.MeshStandardMaterial({ color: new THREE.Color(0x4c6a34), roughness: 0.8, side: THREE.DoubleSide }),
@@ -101,7 +119,7 @@ export class Flower {
     this.particleAges = new Float32Array(MAX_PARTICLES).fill(Infinity);
     this.particleGeometry = new THREE.BufferGeometry();
     this.particleGeometry.setAttribute('position', new THREE.BufferAttribute(this.particlePositions, 3));
-    this.particleMaterial = new THREE.PointsMaterial({ color: baseColor, size: 0.016, transparent: true, opacity: 0.9 });
+    this.particleMaterial = new THREE.PointsMaterial({ color: tintColor, size: 0.016, transparent: true, opacity: 0.9 });
     this.particles = new THREE.Points(this.particleGeometry, this.particleMaterial);
     this.particles.frustumCulled = false;
   }
@@ -115,15 +133,10 @@ export class Flower {
     time: number,
     dt: number,
   ): void {
-    // mutation-driven surface glitch + hue drift
-    let hueSum = 0;
-    for (const p of growth.petals) hueSum += p.hueShift;
-    const n = Math.max(1, growth.petals.length);
     const lastTouchAge = growth.mutations.length ? growth.age - growth.mutations[growth.mutations.length - 1]!.at : 999;
     const touchSurge = Math.max(0, 1 - lastTouchAge / 0.8);
     this.glitch.uGlitch.value = Math.min(0.9, touchSurge * 0.9) * smoothstep(0.1, 0.4, growth.maturity);
     this.glitch.uTime.value = time;
-    this.petalMat.color.setHSL(mod1(this.baseHue + hueSum / n / 360), this.baseSat, 0.55);
 
     if (!present || growth.maturity <= 0.04) {
       this.group.visible = false;
@@ -138,49 +151,37 @@ export class Flower {
     const petalLen = handScale * PETAL_LEN_PER_HAND * emerge;
     const lift = handScale * LIFT_PER_HAND * emerge;
 
-    // flower head floats above the palm, facing the camera (local +Z = toward camera)
     this.group.position.set(originWorld.x, originWorld.y + lift, originWorld.z);
     this.group.rotation.set(wilt * 0.7 + Math.sin(time * 0.5) * 0.02, Math.sin(time * 0.35) * 0.03, Math.sin(time * 0.6) * 0.03);
 
-    // stem down to the palm
     this.stem.scale.set(handScale, lift, handScale);
     this.stem.visible = lift > 0.001;
 
-    // domed center, sized to read against the petals
-    const centerScale = petalLen * 1.5;
-    this.center.scale.set(centerScale, centerScale, centerScale * 0.6);
+    const centerScale = petalLen * 0.55;
+    this.center.position.set(0, 0, 0.01);
+    this.center.scale.set(centerScale, centerScale, 1);
 
-    // petals: distribute around the head, tilt from closed bud to open bloom
-    for (let i = 0; i < this.petalCount; i++) {
+    for (let i = 0; i < this.petals.length; i++) {
+      const p = this.petals[i]!;
       const petal = growth.petals[i]!;
-      const layer = this.layerOf[i]!;
-      const count = this.layerSize[i]!;
-      const theta = (this.idxInLayer[i]! / count) * Math.PI * 2 + (layer === 1 ? Math.PI / count : 0) + this.jitter[i]!;
-
-      // open angle: closed ~82deg (tips toward camera), open ~22deg (stays cupped,
-      // not flat); inner petals open less; wilt folds them back down
-      const layerBias = layer === 1 ? 20 * DEG : 0;
-      const tilt = (60 * DEG) * (1 - unfold) + 22 * DEG + layerBias + wilt * 40 * DEG;
-
-      const sway = Math.sin(time * 1.3 + i) * 0.05 * unfold;
-      const layerScale = layer === 1 ? 0.7 : 1;
+      // closed ~82deg (tips toward camera) -> open ~24deg (stays cupped); wilt folds down
+      const tilt = 58 * DEG * (1 - unfold) + 24 * DEG + p.tiltBias + wilt * 40 * DEG;
+      const sway = Math.sin(time * 1.2 + p.swayPhase) * 0.06 * unfold;
       const fallShrink = petal.detached ? Math.max(0, 1 - petal.fallProgress) : 1;
-      const scale = petalLen * layerScale * (1 + this.jitter[i]! * 0.3) * fallShrink;
+      const scale = petalLen * p.scale * fallShrink;
 
-      this.dummy.position.set(0, 0, 0);
-      if (petal.detached) this.dummy.position.y -= petal.fallProgress * petalLen * 2.5;
-      this.dummy.rotation.set(0, 0, 0);
-      this.dummy.rotateZ(theta);
-      this.dummy.rotateX(tilt + sway);
-      this.dummy.scale.setScalar(scale);
-      this.dummy.updateMatrix();
-      this.petals.setMatrixAt(i, this.dummy.matrix);
+      const m = p.mesh;
+      m.position.set(0, 0, 0);
+      if (petal.detached) m.position.y -= petal.fallProgress * petalLen * 2.5;
+      m.rotation.set(0, 0, 0);
+      m.rotateZ(p.angle + sway * 0.5);
+      m.rotateX(tilt + sway);
+      m.scale.setScalar(scale);
+      m.visible = scale > 1e-4;
 
       if (petal.detached && !this.wasDetached[i]) this.spawnBurst(this.group.position, handScale);
       this.wasDetached[i] = petal.detached;
     }
-    this.petals.instanceMatrix.needsUpdate = true;
-    this.petals.count = this.petalCount;
 
     this.updateParticles(dt);
   }
@@ -219,10 +220,9 @@ export class Flower {
   }
 
   dispose(): void {
-    this.petals.geometry.dispose();
-    this.petalMat.dispose();
+    for (const p of this.petals) p.mesh.geometry.dispose();
+    this.mat.dispose();
     this.center.geometry.dispose();
-    this.center.material.dispose();
     this.stem.geometry.dispose();
     this.stem.material.dispose();
     this.particleGeometry.dispose();
@@ -230,27 +230,45 @@ export class Flower {
   }
 }
 
-/** A curved, tapered petal: narrow at base and tip, widest mid-length, cupped and tip-curled toward +Z. */
-function buildPetalGeometry(edgeComplexity: number): THREE.BufferGeometry {
-  const SU = 12;
+/**
+ * A curved, slightly irregular petal whose UVs sample a radial wedge of the
+ * flower photo (base = photo center, tip = photo edge at `rMax`), so petals
+ * assembled around the head reconstruct the photo.
+ */
+function buildPetalGeometry(
+  sharp: number,
+  angle: number,
+  wedge: number,
+  rMax: number,
+  rand: () => number,
+): THREE.BufferGeometry {
+  const SU = 14;
   const SV = 8;
-  const sharp = 0.5 + edgeComplexity * 1.2; // higher = pointier petal
+  const wavePhase = rand() * Math.PI * 2;
+  const waveAmp = 0.08 + rand() * 0.1; // organic edge waviness
+  const curlAmt = 0.28 + (rand() - 0.5) * 0.16;
+  const twist = (rand() - 0.5) * 0.12;
   const positions: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
 
   for (let i = 0; i <= SU; i++) {
-    const u = i / SU; // base(0) -> tip(1)
-    const width = Math.pow(Math.sin(Math.PI * u), sharp);
+    const u = i / SU;
+    const wave = 1 + waveAmp * Math.sin(u * 7 + wavePhase);
+    const width = Math.pow(Math.sin(Math.PI * u), sharp) * wave;
     for (let j = 0; j <= SV; j++) {
       const v = j / SV;
-      const vv = v * 2 - 1; // -1..1 across
-      const x = vv * 0.4 * width;
+      const vv = v * 2 - 1;
+      const x = vv * 0.4 * width + twist * u;
       const y = u;
-      const curlTip = 0.32 * u * u; // tip curls toward +Z
-      const cup = 0.28 * vv * vv * width; // edges lift toward +Z
+      const curlTip = curlAmt * u * u;
+      const cup = 0.26 * vv * vv * width;
       positions.push(x, y, curlTip + cup);
-      uvs.push(v, u);
+
+      // radial UV: base -> photo center, tip -> photo edge, across -> wedge angle
+      const r = rMax * u;
+      const a = angle + (v - 0.5) * wedge;
+      uvs.push(0.5 + Math.cos(a) * r, 0.5 + Math.sin(a) * r);
     }
   }
   for (let i = 0; i < SU; i++) {
@@ -269,11 +287,17 @@ function buildPetalGeometry(edgeComplexity: number): THREE.BufferGeometry {
   return geo;
 }
 
+/** Remap a unit CircleGeometry's UVs to a small central disc of the photo. */
+function remapCircleUvToPhotoCenter(geo: THREE.CircleGeometry, radius: number): void {
+  const pos = geo.attributes.position as THREE.BufferAttribute;
+  const uv = geo.attributes.uv as THREE.BufferAttribute;
+  for (let i = 0; i < pos.count; i++) {
+    uv.setXY(i, 0.5 + pos.getX(i) * radius, 0.5 + pos.getY(i) * radius);
+  }
+  uv.needsUpdate = true;
+}
+
 function smoothstep(edge0: number, edge1: number, x: number): number {
   const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
   return t * t * (3 - 2 * t);
-}
-
-function mod1(x: number): number {
-  return x - Math.floor(x);
 }
