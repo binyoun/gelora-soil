@@ -73,7 +73,7 @@ export class Flower {
       envMapIntensity: 0.85,
       alphaTest: 0.35,
     });
-    this.glitch = patchGlitch(this.mat, tintColor.getHex(), 0.09);
+    this.glitch = patchGlitch(this.mat, tintColor.getHex(), 0.05);
 
     // more petals than DNA count for a full, delicate bloom, across three layers
     const total = Math.max(12, Math.min(32, Math.round(dna.petalCount * 2.4)));
@@ -122,7 +122,7 @@ export class Flower {
     this.particleAges = new Float32Array(MAX_PARTICLES).fill(Infinity);
     this.particleGeometry = new THREE.BufferGeometry();
     this.particleGeometry.setAttribute('position', new THREE.BufferAttribute(this.particlePositions, 3));
-    this.particleMaterial = new THREE.PointsMaterial({ color: tintColor, size: 0.016, transparent: true, opacity: 0.9 });
+    this.particleMaterial = new THREE.PointsMaterial({ color: tintColor, size: 0.01, transparent: true, opacity: 0.8 });
     this.particles = new THREE.Points(this.particleGeometry, this.particleMaterial);
     this.particles.frustumCulled = false;
   }
@@ -158,7 +158,7 @@ export class Flower {
     const lift = handScale * LIFT_PER_HAND * emerge;
 
     // touch glitch also jitters the whole head slightly, for a stronger hit
-    const jitterAmp = touchSurge * handScale * 0.08;
+    const jitterAmp = touchSurge * handScale * 0.05;
     this.group.position.set(
       originWorld.x + (Math.random() - 0.5) * jitterAmp,
       originWorld.y + lift + (Math.random() - 0.5) * jitterAmp,
@@ -169,7 +169,7 @@ export class Flower {
     this.stem.scale.set(handScale, lift, handScale);
     this.stem.visible = lift > 0.001;
 
-    const centerScale = petalLen * 0.5;
+    const centerScale = petalLen * 0.34;
     this.center.position.set(0, 0, 0.02);
     this.center.scale.set(centerScale, centerScale, 1);
 

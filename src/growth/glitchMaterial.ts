@@ -41,16 +41,16 @@ float glitchHash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 437
 const FRAG_PATCH = `
 #include <dithering_fragment>
 if (uGlitch > 0.001) {
-  vec2 block = floor(vGlitchUv * 12.0);
-  float t = floor(uTime * 12.0);
+  vec2 block = floor(vGlitchUv * 24.0);
+  float t = floor(uTime * 14.0);
   float hr = glitchHash(block + t + 11.1);
   float hg = glitchHash(block + t + 37.7);
   float hb = glitchHash(block + t + 71.3);
   float h  = glitchHash(block + t);
-  vec3 shifted = gl_FragColor.rgb + (vec3(hr, hg, hb) - 0.5) * 0.85;
-  float dropout = step(1.0 - uGlitch * 0.5, h);
+  vec3 shifted = gl_FragColor.rgb + (vec3(hr, hg, hb) - 0.5) * 0.45;
+  float dropout = step(1.0 - uGlitch * 0.22, h);
   shifted = mix(shifted, uTint, dropout);
-  gl_FragColor.rgb = mix(gl_FragColor.rgb, shifted, uGlitch);
+  gl_FragColor.rgb = mix(gl_FragColor.rgb, shifted, uGlitch * 0.7);
 }
 `;
 

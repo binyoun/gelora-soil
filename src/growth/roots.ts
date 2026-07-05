@@ -14,13 +14,12 @@ const MAX_VERTICES = 200;
 const ROOTS_STAGE_END = 0.08;
 const GROUNDED_OPACITY = 0.35;
 
-/** Tendril lines along finger landmark chains, plus a contact shadow at the palm. */
+/** Faint tendril lines along the finger landmark chains, reading as veins on the hand. */
 export class Roots {
   readonly group: THREE.Group;
   private lineGeometry: THREE.BufferGeometry;
   private lineMaterial: THREE.LineBasicMaterial;
   private lines: THREE.LineSegments;
-  private shadow: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
 
   constructor() {
     this.group = new THREE.Group();
@@ -30,19 +29,12 @@ export class Roots {
     this.lineMaterial = new THREE.LineBasicMaterial({ color: 0x9a6a33, transparent: true, opacity: 0 });
     this.lines = new THREE.LineSegments(this.lineGeometry, this.lineMaterial);
     this.group.add(this.lines);
-
-    const shadowGeo = new THREE.CircleGeometry(1, 24);
-    const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0 });
-    this.shadow = new THREE.Mesh(shadowGeo, shadowMat);
-    this.group.add(this.shadow);
   }
 
   update(landmarks: RawLandmark[] | null, ctx: AnchorContext, maturity: number): void {
     const rootsProgress = clamp01(maturity / ROOTS_STAGE_END);
     const opacity = landmarks ? Math.max(rootsProgress, maturity > 0 ? GROUNDED_OPACITY : 0) : 0;
-    // subtle: the hand photo is now the ground, roots read as faint veins on it
     this.lineMaterial.opacity = opacity * 0.5;
-    this.shadow.material.opacity = opacity * 0.25;
 
     if (!landmarks) return;
 
@@ -64,18 +56,11 @@ export class Roots {
     }
     positions.needsUpdate = true;
     this.lineGeometry.setDrawRange(0, vertexIndex);
-
-    const palm = landmarkToWorld(landmarks[9]!, ctx, new THREE.Vector3());
-    this.shadow.position.set(palm.x, palm.y, palm.z + 0.001);
-    const scale = 0.1 * (1 + maturity * 0.4);
-    this.shadow.scale.set(scale, scale, scale);
   }
 
   dispose(): void {
     this.lineGeometry.dispose();
     this.lineMaterial.dispose();
-    this.shadow.geometry.dispose();
-    this.shadow.material.dispose();
   }
 }
 
