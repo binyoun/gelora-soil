@@ -7,7 +7,11 @@ import { MutationField } from './mutate';
 
 const STABILITY_GROWTH_FLOOR = 0.08;
 const STABILITY_GROWTH_CEIL = 0.5;
-const BASE_GROWTH_RATE = 0.4; // maturity/sec approach rate at full stillness
+// Fast emergence (roots + first relief within ~1s), then a long slow climb so the
+// bloom unfolds over tens of seconds. Play time is the point.
+const EMERGE_MATURITY = 0.15;
+const EMERGE_RATE = 0.28;
+const BLOOM_RATE = 0.045;
 
 const WILT_OPENNESS_THRESHOLD = 0.35;
 const WILT_CLOSE_TIME_S = 0.4;
@@ -16,6 +20,8 @@ const WILT_RECOVER_TIME_S = 2.0;
 const POUR_TILT_THRESHOLD_DEG = 60;
 const POUR_DETACH_RATE = 0.6; // detach probability/sec at full over-tilt
 const POUR_FALL_DURATION_S = 2.5;
+const POUR_RECOVER_LIMIT = 0.6; // petals past this fall fraction are gone; before it, they recover
+const POUR_RECOVER_TIME_S = 1.5;
 
 const TOUCH_RADIUS = 0.09; // normalized landmark-space units
 const TOUCH_COOLDOWN_S = 1.0;
@@ -77,9 +83,9 @@ export class GrowthEngine {
   private advanceMaturity(hand: HandState, dt: number): void {
     const s = this.state;
     const growthFactor = smoothstep(STABILITY_GROWTH_FLOOR, STABILITY_GROWTH_CEIL, hand.stability);
-    const growthRate = BASE_GROWTH_RATE * growthFactor;
+    const rate = (s.maturity < EMERGE_MATURITY ? EMERGE_RATE : BLOOM_RATE) * growthFactor;
     // Asymptotic approach toward 1: growth never reverses, jitter only slows it toward zero.
-    s.maturity += (1 - s.maturity) * growthRate * dt;
+    s.maturity += (1 - s.maturity) * rate * dt;
     s.maturity = Math.min(s.maturity, 0.999999);
   }
 
@@ -95,7 +101,8 @@ export class GrowthEngine {
 
   private advancePour(hand: HandState, dt: number): void {
     const s = this.state;
-    if (hand.tilt > POUR_TILT_THRESHOLD_DEG) {
+    const over = hand.tilt > POUR_TILT_THRESHOLD_DEG;
+    if (over) {
       const overTilt = (hand.tilt - POUR_TILT_THRESHOLD_DEG) / (180 - POUR_TILT_THRESHOLD_DEG);
       const detachChance = POUR_DETACH_RATE * clamp01(overTilt) * dt;
       for (const petal of s.petals) {
@@ -106,7 +113,15 @@ export class GrowthEngine {
     }
     for (const petal of s.petals) {
       if (petal.detached) {
-        petal.fallProgress = Math.min(1, petal.fallProgress + dt / POUR_FALL_DURATION_S);
+        // Tilt back before a petal has mostly fallen and it recovers: pour is
+        // reversible until it is nearly gone, so the being lives longer.
+        if (!over && petal.fallProgress < POUR_RECOVER_LIMIT) {
+          petal.detached = false;
+        } else {
+          petal.fallProgress = Math.min(1, petal.fallProgress + dt / POUR_FALL_DURATION_S);
+        }
+      } else if (petal.fallProgress > 0) {
+        petal.fallProgress = Math.max(0, petal.fallProgress - dt / POUR_RECOVER_TIME_S);
       }
     }
   }

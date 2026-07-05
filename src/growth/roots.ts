@@ -40,8 +40,9 @@ export class Roots {
   update(landmarks: RawLandmark[] | null, ctx: AnchorContext, maturity: number): void {
     const rootsProgress = clamp01(maturity / ROOTS_STAGE_END);
     const opacity = landmarks ? Math.max(rootsProgress, maturity > 0 ? GROUNDED_OPACITY : 0) : 0;
-    this.lineMaterial.opacity = opacity * 0.9;
-    this.shadow.material.opacity = opacity * 0.4;
+    // subtle: the hand photo is now the ground, roots read as faint veins on it
+    this.lineMaterial.opacity = opacity * 0.5;
+    this.shadow.material.opacity = opacity * 0.25;
 
     if (!landmarks) return;
 

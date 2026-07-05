@@ -47,6 +47,11 @@ export function landmarkToWorld(point: Vec3, ctx: AnchorContext, out = new THREE
   return out;
 }
 
+/** Landmark -> on-screen normalized position [0,1], for DOM overlays (palm ring). */
+export function landmarkToScreen(point: Vec3, ctx: AnchorContext): { x: number; y: number } {
+  return landmarkToDisplay(point.x, point.y, ctx);
+}
+
 /** World-space distance between two landmarks once anchored: a hand-sized scale unit. */
 export function landmarkSpan(a: Vec3, b: Vec3, ctx: AnchorContext): number {
   const wa = landmarkToWorld(a, ctx, new THREE.Vector3());

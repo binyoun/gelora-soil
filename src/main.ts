@@ -7,11 +7,12 @@ import { buildHandState } from './hand/gestures';
 import { initHandLandmarker, detectHands } from './hand/landmarker';
 import { PalmStabilityTracker, type RawLandmark } from './hand/palm';
 import { GrowthEngine } from './growth/engine';
-import { Petals } from './growth/petals';
+import { Bloom } from './growth/bloom';
 import { Roots } from './growth/roots';
-import { Stem } from './growth/stem';
+import { Soil } from './growth/soil';
+import { buildRelief } from './capture/relief';
 import { ARScene } from './render/scene';
-import { landmarkSpan, landmarkToWorld } from './render/anchor';
+import { landmarkSpan, landmarkToScreen, landmarkToWorld } from './render/anchor';
 import { StageMachine } from './stages';
 import type { FlowerDNA, HandState } from './types';
 import { DebugOverlay, FpsMonitor, isDebugEnabled } from './ui/debug';
@@ -28,6 +29,19 @@ const cameraToggleButton = document.getElementById('camera-toggle') as HTMLButto
 const shutterFallbackButton = document.getElementById('shutter-fallback') as HTMLButtonElement;
 const restartButton = document.getElementById('restart-button') as HTMLButtonElement;
 const promptEl = document.getElementById('prompt')!;
+const captureRing = document.getElementById('capture-ring') as unknown as SVGSVGElement;
+const captureRingProg = captureRing.querySelector('.prog') as SVGCircleElement;
+const palmRing = document.getElementById('palm-ring') as unknown as SVGSVGElement;
+const palmRingProg = palmRing.querySelector('.prog') as SVGCircleElement;
+
+const CAPTURE_RING_C = 2 * Math.PI * 50;
+const PALM_RING_C = 2 * Math.PI * 44;
+captureRingProg.style.strokeDasharray = `${CAPTURE_RING_C}`;
+palmRingProg.style.strokeDasharray = `${PALM_RING_C}`;
+
+function setRingProgress(el: SVGCircleElement, circumference: number, progress: number): void {
+  el.style.strokeDashoffset = `${circumference * (1 - Math.max(0, Math.min(1, progress)))}`;
+}
 
 const EMPTY_HAND: HandState = {
   present: false,
@@ -51,10 +65,12 @@ const debugOverlay = isDebugEnabled() ? new DebugOverlay(debugCanvas) : null;
 
 let growthEngine: GrowthEngine | null = null;
 let currentDna: FlowerDNA | null = null;
-let stem: Stem | null = null;
 let roots: Roots | null = null;
-let petals: Petals | null = null;
+let bloom: Bloom | null = null;
+let soil: Soil | null = null;
 let captureTexture: THREE.CanvasTexture | null = null;
+let handTexture: THREE.CanvasTexture | null = null;
+let handCaptured = false;
 
 let capturing = false;
 let manualShutterTrigger = false;
@@ -131,21 +147,21 @@ function wait(ms: number): Promise<void> {
 }
 
 function disposeGrowthVisuals(): void {
-  if (stem) {
-    arScene.overlayGroup.remove(stem.mesh);
-    stem.dispose();
-  }
   if (roots) {
     arScene.overlayGroup.remove(roots.group);
     roots.dispose();
   }
-  if (petals) {
-    arScene.overlayGroup.remove(petals.instancedMesh, petals.particles);
-    petals.dispose();
+  if (bloom) {
+    arScene.overlayGroup.remove(bloom.mesh, bloom.particles);
+    bloom.dispose();
   }
-  stem = null;
+  if (soil) {
+    arScene.overlayGroup.remove(soil.mesh);
+    soil.dispose();
+  }
   roots = null;
-  petals = null;
+  bloom = null;
+  soil = null;
 }
 
 async function runCapturePipeline(pinchPoint: { x: number; y: number }): Promise<void> {
@@ -154,6 +170,7 @@ async function runCapturePipeline(pinchPoint: { x: number; y: number }): Promise
   const frame = freezeFrame();
   const matted = await segmentFrame(frame, pinchPoint);
   const dna = extractFlowerDNA(matted);
+  const relief = buildRelief(matted);
 
   currentDna = dna;
   captureTexture?.dispose();
@@ -161,12 +178,12 @@ async function runCapturePipeline(pinchPoint: { x: number; y: number }): Promise
   captureTexture.colorSpace = THREE.SRGBColorSpace;
 
   disposeGrowthVisuals();
+  handCaptured = false;
   growthEngine = new GrowthEngine(dna);
-  stem = new Stem(dna);
   roots = new Roots();
-  petals = new Petals(dna);
-  petals.setTexture(captureTexture);
-  arScene.overlayGroup.add(stem.mesh, roots.group, petals.instancedMesh, petals.particles);
+  bloom = new Bloom(dna, relief);
+  bloom.setTexture(captureTexture);
+  arScene.overlayGroup.add(roots.group, bloom.mesh, bloom.particles);
 
   arScene.beginReveal(captureTexture, matted.width / matted.height);
   revealStartMs = performance.now();
@@ -185,10 +202,30 @@ async function runCapturePipeline(pinchPoint: { x: number; y: number }): Promise
   // Stage-section visibility is driven every frame by updateStageUI in the loop.
 }
 
+/** Captures the open palm once, at the moment growth begins, as the dimensional soil ground. */
+async function captureHandSoil(palmPoint: { x: number; y: number }): Promise<void> {
+  handCaptured = true;
+  const frame = freezeFrame();
+  const matted = await segmentFrame(frame, palmPoint);
+  const relief = buildRelief(matted);
+  handTexture?.dispose();
+  handTexture = new THREE.CanvasTexture(matted);
+  handTexture.colorSpace = THREE.SRGBColorSpace;
+  if (soil) {
+    arScene.overlayGroup.remove(soil.mesh);
+    soil.dispose();
+  }
+  soil = new Soil(handTexture, relief);
+  arScene.overlayGroup.add(soil.mesh);
+}
+
 function resetToCapture(): void {
   disposeGrowthVisuals();
   captureTexture?.dispose();
   captureTexture = null;
+  handTexture?.dispose();
+  handTexture = null;
+  handCaptured = false;
   currentDna = null;
   growthEngine = null;
   enteredEndedAtMs = null;
@@ -204,6 +241,23 @@ function resetToCapture(): void {
 function updateStageUI(stage: string, isCapturing: boolean): void {
   stageCaptureSection.classList.toggle('active', stage === 'CAPTURE' && !isCapturing);
   stageGrowSection.classList.toggle('active', stage === 'ENDED');
+}
+
+/** Pinch-hold ring during capture; palm-position ring during the open-palm offer. */
+function updateRings(stage: string, primaryRaw: RawLandmark[] | null): void {
+  const pinch = stage === 'CAPTURE' && !capturing ? shutter.holdProgress : 0;
+  captureRing.style.opacity = pinch > 0.02 ? '1' : '0';
+  setRingProgress(captureRingProg, CAPTURE_RING_C, pinch);
+
+  if (stage === 'SOWING' && primaryRaw) {
+    const s = landmarkToScreen(primaryRaw[9]!, arScene.anchorContext());
+    palmRing.style.display = 'block';
+    palmRing.style.left = `${s.x * window.innerWidth}px`;
+    palmRing.style.top = `${s.y * window.innerHeight}px`;
+    setRingProgress(palmRingProg, PALM_RING_C, stageMachine.sowingProgress);
+  } else {
+    palmRing.style.display = 'none';
+  }
 }
 
 function consumeManualTrigger(): boolean {
@@ -259,9 +313,20 @@ function loop(nowMs: number): void {
       landmarkToWorld(primaryRaw[9]!, ctx, originWorld);
       handScale = Math.max(0.03, landmarkSpan(primaryRaw[0]!, primaryRaw[9]!, ctx));
     }
+
+    // capture the open palm as the soil ground the moment growth begins
+    if (stageMachine.growthGateOpen && !handCaptured && primaryRaw) {
+      captureHandSoil({ x: primaryRaw[9]!.x, y: primaryRaw[9]!.y }).catch((err) => console.error(err));
+    }
+
+    // soil glitch: subtle, synced with recent mutation
+    const lastTouch = state.mutations.length ? state.age - state.mutations[state.mutations.length - 1]!.at : 999;
+    const soilGlitch = Math.min(0.5, Math.max(0, 1 - lastTouch / 0.6) * 0.5);
+
+    const t = nowMs / 1000;
     roots?.update(primaryRaw, ctx, maturity);
-    stem?.update(originWorld, handScale, hand.present, maturity, state.wiltAmount, nowMs / 1000);
-    if (currentDna) petals?.update(currentDna, state, originWorld, handScale, hand.present, nowMs / 1000, dtSeconds);
+    soil?.update(originWorld, handScale, hand.present, soilGlitch, t);
+    if (currentDna) bloom?.update(currentDna, state, originWorld, handScale, hand.present, t, dtSeconds);
   }
 
   if (revealStartMs !== null) {
@@ -291,11 +356,12 @@ function loop(nowMs: number): void {
   }
 
   updateStageUI(stage, capturing);
+  updateRings(stage, primaryRaw);
 
-  if (stage === 'ENDED' && enteredEndedAtMs !== null && nowMs - enteredEndedAtMs > 1000) {
-    if (stem) stem.mesh.visible = false;
+  if (stage === 'ENDED' && enteredEndedAtMs !== null && nowMs - enteredEndedAtMs > 1200) {
+    if (bloom) bloom.mesh.visible = false;
     if (roots) roots.group.visible = false;
-    if (petals) petals.instancedMesh.visible = false;
+    if (soil) soil.mesh.visible = false;
   }
 
   promptUI.set(promptForStage(stage, { handPresent: hand.present, capturing }));

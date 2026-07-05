@@ -3,9 +3,9 @@ import type { Stage } from '../types';
 export function promptForStage(stage: Stage, opts: { handPresent: boolean; capturing: boolean }): string {
   switch (stage) {
     case 'CAPTURE':
-      return opts.capturing ? 'this is who will grow' : 'find a flower. pinch and hold to capture';
+      return opts.capturing ? 'this is who will grow' : 'find a flower, pinch and hold to capture';
     case 'SOWING':
-      return 'offer your open palm';
+      return opts.handPresent ? 'hold your open palm still' : 'offer your open palm';
     case 'GROWING':
       return opts.handPresent ? '' : 'stay with them';
     case 'ENDED':
@@ -13,9 +13,11 @@ export function promptForStage(stage: Stage, opts: { handPresent: boolean; captu
   }
 }
 
+/** One line at a time, cross-faded on change (CSS transitions opacity on #prompt). */
 export class PromptUI {
   private el: HTMLElement;
   private lastText: string | null = null;
+  private timer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(el: HTMLElement) {
     this.el = el;
@@ -24,6 +26,11 @@ export class PromptUI {
   set(text: string): void {
     if (text === this.lastText) return;
     this.lastText = text;
-    this.el.textContent = text;
+    this.el.style.opacity = '0';
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = setTimeout(() => {
+      this.el.textContent = text;
+      this.el.style.opacity = text ? '1' : '0';
+    }, 220);
   }
 }

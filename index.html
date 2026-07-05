@@ -5,22 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
   <title>gelora-soil</title>
   <style>
-    :root { color-scheme: dark; }
-    * { box-sizing: border-box; touch-action: none; }
+    :root {
+      color-scheme: dark;
+      --serif: Georgia, 'Times New Roman', serif;
+      --sans: system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+      --ink: #f2efe9;
+      --muted: rgba(242, 239, 233, 0.62);
+      --line: rgba(242, 239, 233, 0.35);
+      --shadow: 0 1px 10px rgba(0, 0, 0, 0.75);
+    }
+    * { box-sizing: border-box; touch-action: none; -webkit-tap-highlight-color: transparent; }
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
-    body { font-family: 'Courier New', monospace; color: #eee; }
+    body { font-family: var(--sans); color: var(--ink); -webkit-font-smoothing: antialiased; }
 
     #app { position: fixed; inset: 0; }
 
-    /* Stage sections are transparent overlays for stage-specific controls only.
-       pointer-events pass through the section itself so it never blocks the
-       persistent AR layer; the controls inside re-enable their own events. */
-    section { position: absolute; inset: 0; display: none; pointer-events: none; }
-    section.active { display: block; }
-    section button { pointer-events: auto; }
-
-    /* Fullscreen camera video as the background layer; the transparent WebGL
-       canvas is drawn on top of it (same layering as the uncanny-garden work). */
+    /* Fullscreen camera video background; transparent WebGL canvas on top. */
     video#camera-feed {
       position: fixed; inset: 0; width: 100%; height: 100%;
       object-fit: cover; z-index: 0; background: #000;
@@ -31,67 +31,129 @@
       display: block; z-index: 1;
     }
 
+    /* Soft vignette for depth, over the feed but under the UI. */
+    #vignette {
+      position: fixed; inset: 0; z-index: 2; pointer-events: none;
+      background: radial-gradient(ellipse at center, transparent 52%, rgba(0, 0, 0, 0.45) 100%);
+    }
+
     canvas#debug-overlay {
       position: absolute; inset: 0; width: 100%; height: 100%;
       pointer-events: none; z-index: 5;
     }
 
-    #prompt {
-      position: absolute; left: 0; right: 0; bottom: 8%;
-      text-align: center; font-size: 1rem; letter-spacing: 0.02em;
-      color: #eee; text-shadow: 0 1px 4px rgba(0,0,0,0.8);
-      pointer-events: none; z-index: 6;
+    /* Stage overlays cross-fade instead of hard cutting. */
+    section {
+      position: absolute; inset: 0; z-index: 6;
+      opacity: 0; visibility: hidden; transition: opacity 0.6s ease;
+      pointer-events: none;
     }
+    section.active { opacity: 1; visibility: visible; }
+    section button { pointer-events: auto; }
+
+    #prompt {
+      position: absolute; left: 0; right: 0; bottom: 11%;
+      text-align: center; font-size: 1.02rem; font-weight: 300;
+      letter-spacing: 0.06em; color: var(--ink); text-shadow: var(--shadow);
+      padding: 0 2rem; pointer-events: none; z-index: 7;
+      transition: opacity 0.45s ease; opacity: 1;
+    }
+
+    /* Pinch-hold ring, centered, fills as the shutter pinch is held. */
+    #capture-ring {
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      width: 110px; height: 110px; z-index: 7; pointer-events: none;
+      opacity: 0; transition: opacity 0.2s ease;
+    }
+    #capture-ring circle { fill: none; stroke-linecap: round; }
+    #capture-ring .track { stroke: rgba(242, 239, 233, 0.22); stroke-width: 2; }
+    #capture-ring .prog { stroke: var(--ink); stroke-width: 2.5; transition: stroke-dashoffset 0.08s linear; }
+
+    /* Palm-position ring, follows the tracked palm during the offer stage. */
+    #palm-ring {
+      position: absolute; left: 0; top: 0; width: 96px; height: 96px; z-index: 7;
+      transform: translate(-50%, -50%); pointer-events: none; display: none;
+    }
+    #palm-ring circle { fill: none; }
+    #palm-ring .halo { stroke: rgba(242, 239, 233, 0.28); stroke-width: 1.5; }
+    #palm-ring .prog { stroke: var(--ink); stroke-width: 3; stroke-linecap: round; transition: stroke-dashoffset 0.12s linear; }
 
     #shutter-fallback {
-      position: absolute; left: 50%; bottom: 4%; transform: translateX(-50%);
-      width: 64px; height: 64px; border-radius: 50%;
-      border: 2px solid #eee; background: rgba(255,255,255,0.08);
-      z-index: 7;
+      position: absolute; left: 50%; bottom: 5%; transform: translateX(-50%);
+      width: 66px; height: 66px; border-radius: 50%;
+      border: 1.5px solid var(--ink); background: rgba(242, 239, 233, 0.06);
+      box-shadow: var(--shadow); z-index: 8;
     }
+    #shutter-fallback::after {
+      content: ''; position: absolute; inset: 6px; border-radius: 50%;
+      background: rgba(242, 239, 233, 0.9);
+    }
+    #shutter-fallback:active { transform: translateX(-50%) scale(0.94); }
 
     #camera-toggle {
-      position: absolute; top: 4%; right: 4%;
-      width: 40px; height: 40px; border-radius: 50%;
-      border: 1px solid #eee; background: rgba(0,0,0,0.4);
-      color: #eee; font-size: 0.7rem; z-index: 7;
+      position: absolute; top: max(4%, env(safe-area-inset-top)); right: 5%;
+      min-width: 44px; height: 30px; padding: 0 0.7em; border-radius: 16px;
+      border: 1px solid var(--line); background: rgba(0, 0, 0, 0.3);
+      color: var(--muted); font-family: var(--sans); font-size: 0.68rem;
+      letter-spacing: 0.14em; text-transform: lowercase; z-index: 8;
     }
 
     #restart {
-      position: absolute; left: 0; right: 0; bottom: 12%;
-      text-align: center; z-index: 7;
+      position: absolute; left: 0; right: 0; bottom: 13%; text-align: center; z-index: 8;
     }
     #restart button {
-      background: transparent; color: #eee; border: 1px solid #eee;
-      padding: 0.5em 1.2em; font-family: inherit; font-size: 0.85rem;
+      background: transparent; color: var(--ink); border: 1px solid var(--line);
+      padding: 0.65em 1.6em; border-radius: 2px; font-family: var(--sans);
+      font-size: 0.82rem; letter-spacing: 0.16em; text-transform: lowercase;
     }
 
+    /* Onboarding. */
     #permission-gate {
       position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-      text-align: center; padding: 2rem; z-index: 10; background: #000;
+      text-align: center; padding: 1.8rem; z-index: 10;
+      background: radial-gradient(ellipse at center, #14110c 0%, #000 78%);
+      transition: opacity 0.8s ease;
     }
-    #permission-gate.hidden { display: none; }
-    #permission-gate button {
-      background: transparent; color: #eee; border: 1px solid #eee;
-      padding: 0.6em 1.4em; font-family: inherit; font-size: 0.9rem; margin-top: 1rem;
+    #permission-gate.hidden { opacity: 0; pointer-events: none; }
+    #gate-inner { width: 100%; min-width: 0; max-width: 19rem; animation: rise 1.1s ease both; }
+    @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+    #gate-title {
+      font-family: var(--serif); font-style: italic; font-weight: 400;
+      font-size: 2.7rem; letter-spacing: 0.02em; margin: 0 0 1.1rem;
     }
+    #gate-lead {
+      font-size: 1rem; font-weight: 300; line-height: 1.6; letter-spacing: 0.02em;
+      margin: 0 auto 1.6rem; color: var(--ink);
+    }
+    .rule { width: 34px; height: 1px; background: var(--line); margin: 0 auto 1.5rem; }
+    #gate-fine { font-size: 0.74rem; font-weight: 300; letter-spacing: 0.04em; color: var(--muted); margin: 0 0 2rem; line-height: 1.5; }
+    #permission-request {
+      background: transparent; color: var(--ink); border: 1px solid var(--line);
+      padding: 0.8em 2.4em; border-radius: 2px; font-family: var(--sans);
+      font-size: 0.9rem; letter-spacing: 0.24em; text-transform: lowercase;
+      transition: background 0.3s ease, border-color 0.3s ease;
+    }
+    #permission-request:hover { background: rgba(242, 239, 233, 0.08); border-color: var(--ink); }
+    #permission-request:disabled { opacity: 0.4; }
   </style>
 </head>
 <body>
   <div id="app">
-    <div id="permission-gate">
-      <div>
-        <p>gelora-soil needs your camera.<br>nothing is stored, nothing leaves this device.</p>
-        <button id="permission-request">begin</button>
-      </div>
-    </div>
-
-    <!-- Persistent AR layer, shared by every stage. Kept outside the stage
-         sections so switching stages never hides the render surface. -->
     <video id="camera-feed" autoplay playsinline muted></video>
     <canvas id="scene"></canvas>
+    <div id="vignette"></div>
     <canvas id="debug-overlay"></canvas>
     <div id="prompt"></div>
+
+    <svg id="capture-ring" viewBox="0 0 110 110" aria-hidden="true">
+      <circle class="track" cx="55" cy="55" r="50" />
+      <circle class="prog" cx="55" cy="55" r="50" transform="rotate(-90 55 55)" />
+    </svg>
+
+    <svg id="palm-ring" viewBox="0 0 96 96" aria-hidden="true">
+      <circle class="halo" cx="48" cy="48" r="44" />
+      <circle class="prog" cx="48" cy="48" r="44" transform="rotate(-90 48 48)" />
+    </svg>
 
     <section id="stage-capture">
       <button id="camera-toggle" aria-label="toggle camera">flip</button>
@@ -101,6 +163,16 @@
     <section id="stage-grow">
       <div id="restart"><button id="restart-button">begin again</button></div>
     </section>
+
+    <div id="permission-gate">
+      <div id="gate-inner">
+        <h1 id="gate-title">gelora</h1>
+        <p id="gate-lead">a flower you photograph grows from your open hand, and lives only as long as you hold it</p>
+        <div class="rule"></div>
+        <p id="gate-fine">nothing is stored. nothing leaves this device.</p>
+        <button id="permission-request">begin</button>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="/src/main.ts"></script>

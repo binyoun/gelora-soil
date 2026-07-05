@@ -3,7 +3,7 @@ import type { HandState, Stage } from './types';
 const SOWING_STABILITY_THRESHOLD = 0.4;
 const SOWING_HOLD_MS = 700;
 const ROOTS_COMPLETE_MATURITY = 0.08;
-const HAND_LOST_TIMEOUT_MS = 3000;
+const HAND_LOST_TIMEOUT_MS = 6000;
 
 export interface StageInputs {
   shutterFired: boolean;
@@ -18,6 +18,8 @@ export interface StageInputs {
 export class StageMachine {
   stage: Stage = 'CAPTURE';
   sowingCommitted = false;
+  /** 0..1 progress of the open-palm hold that commits SOWING, for the palm-ring UI. */
+  sowingProgress = 0;
 
   private sowingStableSinceMs: number | null = null;
   private handLostSinceMs: number | null = null;
@@ -32,11 +34,14 @@ export class StageMachine {
         const eligible = input.hand.present && input.hand.stability > SOWING_STABILITY_THRESHOLD;
         if (eligible) {
           if (this.sowingStableSinceMs === null) this.sowingStableSinceMs = input.timestampMs;
-          if (!this.sowingCommitted && input.timestampMs - this.sowingStableSinceMs >= SOWING_HOLD_MS) {
+          const held = input.timestampMs - this.sowingStableSinceMs;
+          this.sowingProgress = this.sowingCommitted ? 1 : Math.min(1, held / SOWING_HOLD_MS);
+          if (!this.sowingCommitted && held >= SOWING_HOLD_MS) {
             this.sowingCommitted = true;
           }
         } else {
           this.sowingStableSinceMs = null;
+          this.sowingProgress = this.sowingCommitted ? 1 : 0;
         }
 
         if (this.sowingCommitted && input.maturity >= ROOTS_COMPLETE_MATURITY) {
