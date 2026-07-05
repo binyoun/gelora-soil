@@ -4,8 +4,8 @@ import { landmarkDirectionToWorld, landmarkToWorld, type AnchorMapping } from '.
 import stemFrag from './shaders/stem.frag.glsl?raw';
 import stemVert from './shaders/stem.vert.glsl?raw';
 
-const MAX_STEM_HEIGHT = 0.5;
-const STEM_RADIUS = 0.015;
+const MAX_STEM_HEIGHT = 0.72;
+const STEM_RADIUS = 0.018;
 
 /** Curve extrusion along the palm normal. Rises with maturity, droops with wilt. */
 export class Stem {

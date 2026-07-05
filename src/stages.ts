@@ -1,8 +1,8 @@
 import type { HandState, Stage } from './types';
 
-const SOWING_STABILITY_THRESHOLD = 0.7;
-const SOWING_HOLD_MS = 1500;
-const ROOTS_COMPLETE_MATURITY = 0.1;
+const SOWING_STABILITY_THRESHOLD = 0.4;
+const SOWING_HOLD_MS = 700;
+const ROOTS_COMPLETE_MATURITY = 0.08;
 const HAND_LOST_TIMEOUT_MS = 3000;
 
 export interface StageInputs {

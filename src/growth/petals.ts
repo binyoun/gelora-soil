@@ -5,8 +5,8 @@ import petalFrag from './shaders/petal.frag.glsl?raw';
 import petalVert from './shaders/petal.vert.glsl?raw';
 
 const MAX_PETALS = 16;
-const ORBIT_RADIUS = 0.14;
-const ORBIT_SPEED = 0.15;
+const ORBIT_RADIUS = 0.22;
+const ORBIT_SPEED = 0.35;
 const MAX_PARTICLES = 400;
 const PARTICLES_PER_DETACH = 12;
 const PARTICLE_LIFETIME_S = 2.5;
@@ -33,8 +33,8 @@ export class Petals {
   private dummy = new THREE.Object3D();
 
   constructor(dna: FlowerDNA) {
-    const geometry = new THREE.PlaneGeometry(0.05, 0.08, 4, 6);
-    geometry.translate(0, 0.04, 0);
+    const geometry = new THREE.PlaneGeometry(0.09, 0.15, 4, 8);
+    geometry.translate(0, 0.075, 0);
 
     this.hueShiftAttr = new THREE.InstancedBufferAttribute(new Float32Array(MAX_PETALS), 1);
     this.warpAttr = new THREE.InstancedBufferAttribute(new Float32Array(MAX_PETALS), 1);
@@ -100,14 +100,18 @@ export class Petals {
         const petal = growth.petals[i]!;
         const angle = (i / dna.petalCount) * Math.PI * 2 + growth.age * ORBIT_SPEED;
         const radius = ORBIT_RADIUS * unfold;
+        // per-petal continuous life: a bob and a breathing pulse so the bloom never sits still
+        const bob = Math.sin(time * 1.6 + i * 1.3) * 0.02 * unfold;
+        const breathe = 1 + Math.sin(time * 2.2 + i * 0.9) * 0.12 * unfold;
 
         this.dummy.position.set(
           origin.x + Math.cos(angle) * radius,
-          origin.y + Math.sin(angle) * radius * 0.6 + unfold * 0.05,
-          origin.z,
+          origin.y + Math.sin(angle) * radius * 0.6 + unfold * 0.09 + bob,
+          origin.z + Math.sin(time * 1.1 + i) * 0.02 * unfold,
         );
-        this.dummy.rotation.set(0, 0, angle);
-        const bloomScale = (0.4 + 0.6 * unfold) * (petal.detached ? Math.max(0, 1 - petal.fallProgress) : 1);
+        // spin in-plane, and tilt outward as the petals open into a 3D bloom
+        this.dummy.rotation.set(unfold * 0.9, 0, angle);
+        const bloomScale = (0.5 + 0.9 * unfold) * breathe * (petal.detached ? Math.max(0, 1 - petal.fallProgress) : 1);
         this.dummy.scale.setScalar(bloomScale);
         this.dummy.updateMatrix();
         this.instancedMesh.setMatrixAt(i, this.dummy.matrix);

@@ -24,8 +24,12 @@ void main() {
   pos.z -= curl * 0.08;
   pos.y -= curl * 0.05;
 
-  // warp: gentle DNA-seeded asymmetric bulge
-  pos += normal * sin(uv.x * 6.2831 + aHueShift * 0.05) * aWarp * 0.02;
+  // warp: DNA-seeded asymmetric bulge plus a living, time-driven ripple so the
+  // petal surface visibly mutates as it is held
+  pos += normal * sin(uv.x * 6.2831 + aHueShift * 0.05) * aWarp * 0.06;
+  pos += normal * sin(uv.y * 8.0 + uTime * 2.0 + aHueShift * 0.1) * aWarp * 0.035;
+  // elongate/curl the tip with warp for a more creature-like silhouette
+  pos.y += sin(uv.y * 3.1416) * aWarp * 0.04;
 
   vec4 localPosition = instanceMatrix * vec4(pos, 1.0);
   vec4 viewPosition = modelViewMatrix * localPosition;

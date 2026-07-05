@@ -10,9 +10,10 @@ void main() {
 
   vec3 pos = position;
 
-  // gentle organic sway, more pronounced toward the tip
-  float sway = sin(uTime * 0.6 + uv.y * 4.0) * 0.01 * uv.y;
+  // organic sway, more pronounced toward the tip
+  float sway = sin(uTime * 0.9 + uv.y * 4.0) * 0.025 * uv.y;
   pos.x += sway;
+  pos.z += cos(uTime * 0.7 + uv.y * 3.0) * 0.018 * uv.y;
 
   // sprout-stage surface displacement: small bumps rising with the stem
   float bump = sin(uv.y * 20.0 + uTime * 1.5) * 0.004 * (1.0 - uv.y) * uMaturity;

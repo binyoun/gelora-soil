@@ -17,13 +17,16 @@ export class MutationField {
 
   driftHue(dna: FlowerDNA, petalIndex: number, age: number): number {
     const phase = this.phasePerPetal[petalIndex] ?? 0;
-    const speed = 0.05 + dna.hueSpread * 0.15;
-    return Math.sin(age * speed + phase) * dna.hueSpread * 30;
+    // Every flower shifts hue noticeably; high-spread flowers wander further and faster.
+    const speed = 0.25 + dna.hueSpread * 0.5;
+    const amplitude = 18 + dna.hueSpread * 45;
+    return Math.sin(age * speed + phase) * amplitude;
   }
 
   driftWarp(dna: FlowerDNA, petalIndex: number, age: number): number {
     const phase = this.phasePerPetal[petalIndex] ?? 0;
-    return (Math.sin(age * 0.3 + phase * 1.7) * 0.5 + 0.5) * dna.edgeComplexity;
+    const floor = 0.35; // always some living movement, even for smooth-edged flowers
+    return (Math.sin(age * 0.7 + phase * 1.7) * 0.5 + 0.5) * (floor + dna.edgeComplexity * (1 - floor));
   }
 
   applyTouch(petal: PetalState, at: number): MutationEvent {

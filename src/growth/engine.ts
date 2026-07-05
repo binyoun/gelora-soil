@@ -5,9 +5,9 @@ import { MutationField } from './mutate';
 // No Three.js or MediaPipe imports here. Phase 2 (WebXR) re-renders this same
 // state inside an immersive-ar session; the engine must not care who owns the frame.
 
-const STABILITY_GROWTH_FLOOR = 0.3;
-const STABILITY_GROWTH_CEIL = 0.9;
-const BASE_GROWTH_RATE = 0.15; // maturity/sec approach rate at full stillness
+const STABILITY_GROWTH_FLOOR = 0.08;
+const STABILITY_GROWTH_CEIL = 0.5;
+const BASE_GROWTH_RATE = 0.4; // maturity/sec approach rate at full stillness
 
 const WILT_OPENNESS_THRESHOLD = 0.35;
 const WILT_CLOSE_TIME_S = 0.4;
@@ -69,7 +69,7 @@ export class GrowthEngine {
     this.advanceMaturity(hand, dtSeconds);
     this.advanceWilt(hand, dtSeconds);
     this.advancePour(hand, dtSeconds);
-    this.advanceBloom(hand);
+    this.advanceBloom(hand, dtSeconds);
 
     return s;
   }
@@ -111,15 +111,19 @@ export class GrowthEngine {
     }
   }
 
-  private advanceBloom(hand: HandState): void {
+  private advanceBloom(hand: HandState, dt: number): void {
     const s = this.state;
-    if (s.maturity <= 0.3) return;
+    // Mutation begins as soon as petals appear, so the being reads as alive early.
+    if (s.maturity <= 0.12) return;
 
     for (const petal of s.petals) {
       if (petal.detached) continue;
-      petal.hueShift += this.mutation.driftHue(this.dna, petal.index, s.age) * 0.002;
+      // Strong, continuous hue wander and warp so the being visibly keeps
+      // mutating for as long as it is held, not settling into a static bloom.
+      petal.hueShift += this.mutation.driftHue(this.dna, petal.index, s.age) * dt * 1.2;
       const target = this.mutation.driftWarp(this.dna, petal.index, s.age);
-      petal.warp = clamp01(petal.warp * 0.98 + target * 0.02);
+      const warpAlpha = 1 - Math.exp(-dt / 0.6);
+      petal.warp = clamp01(petal.warp + (target - petal.warp) * warpAlpha);
     }
 
     if (!hand.secondHandTip) return;

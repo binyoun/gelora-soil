@@ -291,6 +291,8 @@ function loop(nowMs: number): void {
       hand: hand.present ? hand : null,
       landmarks: primaryRaw,
       dna: currentDna,
+      maturity: growthEngine?.getState().maturity ?? 0,
+      wilt: growthEngine?.getState().wiltAmount ?? 0,
       mirror,
     });
   }

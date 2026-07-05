@@ -11,8 +11,8 @@ const FINGER_CHAINS: number[][] = [
 ];
 
 const MAX_VERTICES = 200;
-const ROOTS_STAGE_END = 0.1;
-const GROUNDED_OPACITY = 0.15;
+const ROOTS_STAGE_END = 0.08;
+const GROUNDED_OPACITY = 0.35;
 
 /** Tendril lines along finger landmark chains, plus a contact shadow at the palm. */
 export class Roots {
@@ -27,7 +27,7 @@ export class Roots {
 
     this.lineGeometry = new THREE.BufferGeometry();
     this.lineGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(MAX_VERTICES * 3), 3));
-    this.lineMaterial = new THREE.LineBasicMaterial({ color: 0x6b4a2a, transparent: true, opacity: 0 });
+    this.lineMaterial = new THREE.LineBasicMaterial({ color: 0x9a6a33, transparent: true, opacity: 0 });
     this.lines = new THREE.LineSegments(this.lineGeometry, this.lineMaterial);
     this.group.add(this.lines);
 
@@ -40,8 +40,8 @@ export class Roots {
   update(landmarks: RawLandmark[] | null, map: AnchorMapping, maturity: number): void {
     const rootsProgress = clamp01(maturity / ROOTS_STAGE_END);
     const opacity = landmarks ? Math.max(rootsProgress, maturity > 0 ? GROUNDED_OPACITY : 0) : 0;
-    this.lineMaterial.opacity = opacity * 0.6;
-    this.shadow.material.opacity = opacity * 0.35;
+    this.lineMaterial.opacity = opacity * 0.9;
+    this.shadow.material.opacity = opacity * 0.4;
 
     if (!landmarks) return;
 

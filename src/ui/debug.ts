@@ -60,6 +60,8 @@ export class DebugOverlay {
     hand: HandState | null;
     landmarks: RawLandmark[] | null;
     dna: FlowerDNA | null;
+    maturity: number;
+    wilt: number;
     mirror: boolean;
   }): void {
     const { ctx, canvas } = this;
@@ -76,6 +78,7 @@ export class DebugOverlay {
 
     line(`fps: ${params.fps.toFixed(1)}`);
     line(`stage: ${params.stage}`);
+    line(`maturity: ${params.maturity.toFixed(3)}  wilt: ${params.wilt.toFixed(2)}`);
     if (params.hand) {
       line(
         `openness: ${params.hand.openness.toFixed(2)}  stability: ${params.hand.stability.toFixed(2)}  tilt: ${params.hand.tilt.toFixed(1)}`,
