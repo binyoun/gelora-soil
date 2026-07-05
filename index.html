@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <title>gelora-soil</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; touch-action: none; }
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+    body { font-family: 'Courier New', monospace; color: #eee; }
+
+    #app { position: fixed; inset: 0; }
+
+    section { position: absolute; inset: 0; display: none; }
+    section.active { display: block; }
+
+    canvas#scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    video#camera-feed { display: none; }
+
+    canvas#debug-overlay {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      pointer-events: none; z-index: 5;
+    }
+
+    #prompt {
+      position: absolute; left: 0; right: 0; bottom: 8%;
+      text-align: center; font-size: 1rem; letter-spacing: 0.02em;
+      color: #eee; text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+      pointer-events: none; z-index: 6;
+    }
+
+    #shutter-fallback {
+      position: absolute; left: 50%; bottom: 4%; transform: translateX(-50%);
+      width: 64px; height: 64px; border-radius: 50%;
+      border: 2px solid #eee; background: rgba(255,255,255,0.08);
+      z-index: 7;
+    }
+
+    #camera-toggle {
+      position: absolute; top: 4%; right: 4%;
+      width: 40px; height: 40px; border-radius: 50%;
+      border: 1px solid #eee; background: rgba(0,0,0,0.4);
+      color: #eee; font-size: 0.7rem; z-index: 7;
+    }
+
+    #restart {
+      position: absolute; left: 0; right: 0; bottom: 12%;
+      text-align: center; z-index: 7;
+    }
+    #restart button {
+      background: transparent; color: #eee; border: 1px solid #eee;
+      padding: 0.5em 1.2em; font-family: inherit; font-size: 0.85rem;
+    }
+
+    #permission-gate {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      text-align: center; padding: 2rem; z-index: 10; background: #000;
+    }
+    #permission-gate.hidden { display: none; }
+    #permission-gate button {
+      background: transparent; color: #eee; border: 1px solid #eee;
+      padding: 0.6em 1.4em; font-family: inherit; font-size: 0.9rem; margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="permission-gate">
+      <div>
+        <p>gelora-soil needs your camera.<br>nothing is stored, nothing leaves this device.</p>
+        <button id="permission-request">begin</button>
+      </div>
+    </div>
+
+    <section id="stage-capture">
+      <video id="camera-feed" autoplay playsinline muted></video>
+      <canvas id="scene"></canvas>
+      <canvas id="debug-overlay"></canvas>
+      <button id="camera-toggle" aria-label="toggle camera">flip</button>
+      <button id="shutter-fallback" aria-label="capture flower"></button>
+      <div id="prompt"></div>
+    </section>
+
+    <section id="stage-grow">
+      <div id="restart"><button id="restart-button">begin again</button></div>
+    </section>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
