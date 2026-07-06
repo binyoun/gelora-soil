@@ -7,6 +7,7 @@ import { initHandLandmarker, detectHands } from './hand/landmarker';
 import { PalmStabilityTracker, type RawLandmark } from './hand/palm';
 import { GrowthEngine } from './growth/engine';
 import { Flower } from './growth/flower';
+import { TEMPLATES, type FlowerTemplate } from './growth/flowerTemplates';
 import { Roots } from './growth/roots';
 import { ARScene } from './render/scene';
 import { landmarkSpan, landmarkToScreen, landmarkToWorld } from './render/anchor';
@@ -71,6 +72,7 @@ let restartRequested = false;
 let enteredEndedAtMs: number | null = null;
 let revealStartMs: number | null = null;
 let captureCountdownStartMs: number | null = null;
+let selectedTemplate: FlowerTemplate = TEMPLATES[0]!; // chosen on the landing page
 const originWorld = new THREE.Vector3();
 let handScale = 0.15;
 let pixelRatioHalved = false;
@@ -129,6 +131,26 @@ window.addEventListener('pointerdown', () => {
   if (stageMachine.stage === 'ENDED') restartRequested = true;
 });
 
+// Landing-page flower chooser (built from the vanitas templates).
+const flowerChoices = document.getElementById('flower-choices')!;
+TEMPLATES.forEach((tpl, i) => {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'flower-choice' + (tpl === selectedTemplate ? ' selected' : '');
+  const name = document.createElement('span');
+  name.className = 'fc-name';
+  name.textContent = tpl.name;
+  const story = document.createElement('span');
+  story.className = 'fc-story';
+  story.textContent = tpl.story;
+  btn.append(name, story);
+  btn.addEventListener('click', () => {
+    selectedTemplate = tpl;
+    flowerChoices.querySelectorAll('.flower-choice').forEach((el, j) => el.classList.toggle('selected', j === i));
+  });
+  flowerChoices.appendChild(btn);
+});
+
 function freezeFrame(): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
   canvas.width = videoEl.videoWidth;
@@ -169,7 +191,7 @@ async function runCapturePipeline(pinchPoint: { x: number; y: number }): Promise
   disposeGrowthVisuals();
   growthEngine = new GrowthEngine(dna);
   roots = new Roots();
-  flower = new Flower(dna, captureTexture);
+  flower = new Flower(dna, captureTexture, selectedTemplate);
   arScene.overlayGroup.add(roots.group, flower.group, flower.particles);
 
   arScene.beginReveal(captureTexture, matted.width / matted.height);

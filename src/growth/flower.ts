@@ -2,27 +2,13 @@ import * as THREE from 'three';
 import type { FlowerDNA, GrowthState } from '../types';
 import { mulberry32 } from '../util/rng';
 import { patchGlitch, type GlitchUniforms } from './glitchMaterial';
+import type { FlowerTemplate, PetalShape } from './flowerTemplates';
 
-const PETAL_LEN_PER_HAND = 2.5; // petal length as a multiple of hand span (bigger bloom)
-const LIFT_PER_HAND = 2.0; // flower head height above the palm
+const PETAL_LEN_PER_HAND = 2.5;
+const LIFT_PER_HAND = 2.0;
 const MAX_PARTICLES = 320;
 const PARTICLE_LIFETIME_S = 2.4;
-
 const DEG = Math.PI / 180;
-
-interface LayerDef {
-  frac: number; // share of total petals
-  rMax: number; // photo radius sampled (center .. edge)
-  scale: number;
-  tiltBias: number; // extra tilt (more upright inward)
-  z: number; // forward offset for depth stacking
-}
-
-const LAYERS: LayerDef[] = [
-  { frac: 0.4, rMax: 0.44, scale: 1.0, tiltBias: 0, z: 0.0 },
-  { frac: 0.34, rMax: 0.3, scale: 0.72, tiltBias: 16 * DEG, z: 0.06 },
-  { frac: 0.26, rMax: 0.18, scale: 0.48, tiltBias: 32 * DEG, z: 0.11 },
-];
 
 interface PetalParam {
   mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>;
@@ -31,25 +17,28 @@ interface PetalParam {
   tiltBias: number;
   z: number;
   swayPhase: number;
+  rest?: { pos: THREE.Vector3; rotZ: number }; // bilateral parts (ghost orchid)
 }
 
 /**
- * A DNA-driven flower model that wears the captured flower photo. Many thin
- * petals in three depth layers make a delicate, full bloom; each petal is its
- * own mesh whose UVs sample a radial wedge of the photo, so the assembled bloom
- * reconstructs the real flower's image in 3D. An organic curved, tapered stalk
- * extends down toward the hand. Grows/wilts/pours with GrowthState, and glitches
- * its surface (uncanny-garden ModelGlitch idiom) on mediated-touch mutation.
+ * A DNA-driven flower that wears the captured selfie, built from a FlowerTemplate
+ * (one of four vanitas flowers). Radial flowers assemble layered petals whose
+ * UVs sample a radial wedge of the selfie; the ghost orchid is bilateral. Grows,
+ * wilts, pours, and glitches via GrowthState; pour residue is glowing motes.
  */
 export class Flower {
   readonly group: THREE.Group;
   readonly particles: THREE.InstancedMesh;
 
   private petals: PetalParam[] = [];
-  private center: THREE.Mesh<THREE.CircleGeometry, THREE.MeshStandardMaterial>;
-  private stem: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>;
+  private center: THREE.Object3D | null = null;
+  private centerMat: THREE.Material | null = null;
+  private stem: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial> | null = null;
   private mat: THREE.MeshStandardMaterial;
   private glitch: GlitchUniforms;
+  private openBase: number;
+  private closeExtra: number;
+  private centerScaleFactor: number;
 
   private particlePos: Float32Array;
   private particleVelocities: Float32Array;
@@ -61,60 +50,42 @@ export class Flower {
   private nextParticle = 0;
   private wasDetached: boolean[];
 
-  constructor(dna: FlowerDNA, photo: THREE.Texture) {
+  constructor(dna: FlowerDNA, photo: THREE.Texture, template: FlowerTemplate) {
     this.group = new THREE.Group();
     const rand = mulberry32(dna.seed);
     const tintColor = new THREE.Color().setHSL(dna.hueCenter / 360, Math.max(0.4, dna.saturation), 0.55);
+    this.openBase = template.openBaseDeg;
+    this.closeExtra = template.closeExtraDeg;
+    this.centerScaleFactor = template.centerScale;
 
     this.mat = new THREE.MeshStandardMaterial({
       map: photo,
       color: 0xffffff,
-      roughness: 0.62,
+      roughness: template.roughness,
       metalness: 0.0,
       side: THREE.DoubleSide,
       envMapIntensity: 0.85,
       alphaTest: 0.35,
+      emissive: new THREE.Color(template.emissive),
+      emissiveIntensity: template.emissiveIntensity,
     });
     this.glitch = patchGlitch(this.mat, tintColor.getHex(), 0.05);
 
-    // more petals than DNA count for a full, delicate bloom, across three layers
-    const total = Math.max(12, Math.min(32, Math.round(dna.petalCount * 2.4)));
-    const sharp = 0.6 + dna.edgeComplexity * 1.6;
-
-    for (const layer of LAYERS) {
-      const count = Math.max(3, Math.round(total * layer.frac));
-      const wedge = ((Math.PI * 2) / count) * 1.2;
-      const angleOffset = rand() * Math.PI * 2;
-      for (let k = 0; k < count; k++) {
-        const jitter = (rand() - 0.5) * 0.2;
-        const angle = (k / count) * Math.PI * 2 + angleOffset + jitter;
-        const geo = buildPetalGeometry(sharp, angle, wedge, layer.rMax, rand);
-        const mesh = new THREE.Mesh(geo, this.mat);
-        mesh.frustumCulled = false;
-        this.group.add(mesh);
-        this.petals.push({
-          mesh,
-          angle,
-          scale: layer.scale * (0.88 + rand() * 0.28),
-          tiltBias: layer.tiltBias + (rand() - 0.5) * 14 * DEG,
-          z: layer.z,
-          swayPhase: rand() * Math.PI * 2,
-        });
-      }
+    if (template.symmetry === 'bilateral') {
+      this.buildGhostOrchid(template, rand);
+    } else {
+      this.buildRadial(template, rand);
     }
 
-    const centerGeo = new THREE.CircleGeometry(1, 28);
-    remapCircleUvToPhotoCenter(centerGeo, 0.12);
-    this.center = new THREE.Mesh(centerGeo, this.mat);
-    this.center.frustumCulled = false;
-    this.group.add(this.center);
+    this.buildCenter(template, rand);
 
-    // organic curved, tapered stalk toward the hand (not a rigid cylinder)
-    this.stem = new THREE.Mesh(
-      buildStemGeometry(rand),
-      new THREE.MeshStandardMaterial({ color: new THREE.Color(0x5c6a3c), roughness: 0.85, side: THREE.DoubleSide }),
-    );
-    this.group.add(this.stem);
+    if (template.stem) {
+      this.stem = new THREE.Mesh(
+        buildStemGeometry(rand),
+        new THREE.MeshStandardMaterial({ color: new THREE.Color(0x5c6a3c), roughness: 0.85, side: THREE.DoubleSide }),
+      );
+      this.group.add(this.stem);
+    }
 
     this.group.visible = false;
 
@@ -124,13 +95,11 @@ export class Flower {
     this.particleAges = new Float32Array(MAX_PARTICLES).fill(Infinity);
     this.particleSize = new Float32Array(MAX_PARTICLES);
 
-    // soft glowing billboard quads (additive) that fade like droplets of light,
-    // instead of hard square points. Real triangles, so no gl_PointSize limits.
     const quad = new THREE.PlaneGeometry(1, 1);
     this.particleAlphaAttr = new THREE.InstancedBufferAttribute(new Float32Array(MAX_PARTICLES), 1);
     quad.setAttribute('aAlpha', this.particleAlphaAttr);
     this.particleMaterial = new THREE.ShaderMaterial({
-      uniforms: { uColor: { value: new THREE.Color(0x5cc4e8) } }, // water blue
+      uniforms: { uColor: { value: new THREE.Color(template.glowTint) } },
       vertexShader: `
         attribute float aAlpha;
         varying vec2 vUv;
@@ -160,10 +129,91 @@ export class Flower {
     this.particles = new THREE.InstancedMesh(quad, this.particleMaterial, MAX_PARTICLES);
     this.particles.frustumCulled = false;
     this.particles.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    // start all hidden (zero scale)
     this.particleDummy.scale.setScalar(0);
     this.particleDummy.updateMatrix();
     for (let i = 0; i < MAX_PARTICLES; i++) this.particles.setMatrixAt(i, this.particleDummy.matrix);
+  }
+
+  private buildRadial(template: FlowerTemplate, rand: () => number): void {
+    for (const layer of template.layers) {
+      const wedge = ((Math.PI * 2) / layer.count) * 1.2;
+      const angleOffset = rand() * Math.PI * 2;
+      for (let k = 0; k < layer.count; k++) {
+        const jitter = (rand() - 0.5) * 0.2;
+        const angle = (k / layer.count) * Math.PI * 2 + angleOffset + jitter;
+        const geo = buildPetalGeometry(template.petal, angle, wedge, layer.rMax, rand);
+        const mesh = new THREE.Mesh(geo, this.mat);
+        mesh.frustumCulled = false;
+        this.group.add(mesh);
+        this.petals.push({
+          mesh,
+          angle,
+          scale: layer.scale * (0.88 + rand() * 0.28),
+          tiltBias: layer.tiltBias + (rand() - 0.5) * 14 * DEG,
+          z: layer.z,
+          swayPhase: rand() * Math.PI * 2,
+        });
+      }
+    }
+  }
+
+  private buildGhostOrchid(template: FlowerTemplate, rand: () => number): void {
+    const b = template.petal;
+    const parts: Array<{ shape: PetalShape; angleDeg: number; rotZDeg: number; pos: [number, number, number]; scale: number }> = [
+      { shape: { ...b, width: 0.14, sharp: 1.7 }, angleDeg: 90, rotZDeg: 0, pos: [0, 0.0, 0.03], scale: 0.8 }, // dorsal sepal (up)
+      { shape: { ...b, width: 0.12, sharp: 1.8, strap: 0.2 }, angleDeg: 145, rotZDeg: 52, pos: [0, 0.02, 0.02], scale: 0.9 }, // lateral (up-left)
+      { shape: { ...b, width: 0.12, sharp: 1.8, strap: 0.2 }, angleDeg: 35, rotZDeg: -52, pos: [0, 0.02, 0.02], scale: 0.9 }, // lateral (up-right)
+      { shape: { ...b, width: 0.5, sharp: 0.8, cup: 0.5, waveAmp: 0.07, waveFreq: 7 }, angleDeg: 270, rotZDeg: 180, pos: [0, -0.02, 0.05], scale: 1.0 }, // lip (down)
+      { shape: { ...b, width: 0.05, sharp: 1.0, strap: 0.78, curl: 0.05 }, angleDeg: 248, rotZDeg: 180 - 30, pos: [0, -0.12, 0.0], scale: 1.7 }, // tendril (leg)
+      { shape: { ...b, width: 0.05, sharp: 1.0, strap: 0.78, curl: 0.05 }, angleDeg: 292, rotZDeg: 180 + 30, pos: [0, -0.12, 0.0], scale: 1.7 }, // tendril (leg)
+    ];
+    for (const part of parts) {
+      const wedge = 60 * DEG;
+      const geo = buildPetalGeometry(part.shape, part.angleDeg * DEG, wedge, 0.42, rand);
+      const mesh = new THREE.Mesh(geo, this.mat);
+      mesh.frustumCulled = false;
+      this.group.add(mesh);
+      this.petals.push({
+        mesh,
+        angle: part.angleDeg * DEG,
+        scale: part.scale,
+        tiltBias: 0,
+        z: part.pos[2],
+        swayPhase: rand() * Math.PI * 2,
+        rest: { pos: new THREE.Vector3(part.pos[0], part.pos[1], part.pos[2]), rotZ: part.rotZDeg * DEG },
+      });
+    }
+  }
+
+  private buildCenter(template: FlowerTemplate, rand: () => number): void {
+    if (template.center === 'disc') {
+      const geo = new THREE.CircleGeometry(1, 28);
+      remapCircleUvToPhotoCenter(geo, 0.12);
+      const mesh = new THREE.Mesh(geo, this.mat);
+      mesh.frustumCulled = false;
+      this.center = mesh;
+      this.group.add(mesh);
+    } else if (template.center === 'tuft') {
+      const cone = new THREE.ConeGeometry(0.06, 1, 5);
+      cone.translate(0, 0.5, 0);
+      const mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(template.centerColor), roughness: 0.6 });
+      this.centerMat = mat;
+      const n = 16;
+      const inst = new THREE.InstancedMesh(cone, mat, n);
+      inst.frustumCulled = false;
+      const d = new THREE.Object3D();
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2 + rand();
+        const r = 0.12 + rand() * 0.16;
+        d.position.set(Math.cos(a) * r, 0, Math.sin(a) * r);
+        d.rotation.set((rand() - 0.5) * 0.5, 0, (rand() - 0.5) * 0.5);
+        d.scale.set(1, 0.7 + rand() * 0.6, 1);
+        d.updateMatrix();
+        inst.setMatrixAt(i, d.matrix);
+      }
+      this.center = inst;
+      this.group.add(inst);
+    }
   }
 
   update(
@@ -175,8 +225,6 @@ export class Flower {
     time: number,
     dt: number,
   ): void {
-    // glitch: a small living baseline once bloomed, spiking hard and lingering on
-    // a mediated-touch mutation
     const lastTouchAge = growth.mutations.length ? growth.age - growth.mutations[growth.mutations.length - 1]!.at : 999;
     const touchSurge = Math.max(0, 1 - lastTouchAge / 1.6);
     const base = 0.08 * smoothstep(0.25, 0.55, growth.maturity);
@@ -196,7 +244,6 @@ export class Flower {
     const petalLen = handScale * PETAL_LEN_PER_HAND * emerge;
     const lift = handScale * LIFT_PER_HAND * emerge;
 
-    // touch glitch also jitters the whole head slightly, for a stronger hit
     const jitterAmp = touchSurge * handScale * 0.1;
     this.group.position.set(
       originWorld.x + (Math.random() - 0.5) * jitterAmp,
@@ -205,28 +252,39 @@ export class Flower {
     );
     this.group.rotation.set(wilt * 0.7 + Math.sin(time * 0.5) * 0.02, Math.sin(time * 0.35) * 0.03, Math.sin(time * 0.6) * 0.03);
 
-    this.stem.scale.set(handScale, lift, handScale);
-    this.stem.visible = lift > 0.001;
-
-    const centerScale = petalLen * 0.34;
-    this.center.position.set(0, 0, 0.02);
-    this.center.scale.set(centerScale, centerScale, 1);
+    if (this.stem) {
+      this.stem.scale.set(handScale, lift, handScale);
+      this.stem.visible = lift > 0.001;
+    }
+    if (this.center) {
+      const cs = petalLen * this.centerScaleFactor;
+      this.center.position.set(0, 0, 0.02);
+      this.center.scale.set(cs, cs, cs);
+    }
 
     const nState = growth.petals.length;
     for (let i = 0; i < this.petals.length; i++) {
       const p = this.petals[i]!;
-      const petal = growth.petals[i % nState]!; // more visual petals than DNA state: share cyclically
-      const tilt = 58 * DEG * (1 - unfold) + 26 * DEG + p.tiltBias + wilt * 40 * DEG;
+      const petal = growth.petals[i % nState]!;
       const sway = Math.sin(time * 1.2 + p.swayPhase) * 0.06 * unfold;
       const fallShrink = petal.detached ? Math.max(0, 1 - petal.fallProgress) : 1;
       const scale = petalLen * p.scale * fallShrink;
-
       const m = p.mesh;
-      m.position.set(0, 0, p.z * petalLen);
-      if (petal.detached) m.position.y -= petal.fallProgress * petalLen * 2.5;
-      m.rotation.set(0, 0, 0);
-      m.rotateZ(p.angle + sway * 0.5);
-      m.rotateX(tilt + sway);
+
+      if (p.rest) {
+        // bilateral part (ghost orchid): fixed orientation, scales in, sways
+        m.position.set(p.rest.pos.x * petalLen, p.rest.pos.y * petalLen, p.rest.pos.z * petalLen);
+        if (petal.detached) m.position.y -= petal.fallProgress * petalLen * 2.5;
+        m.rotation.set(0, 0, p.rest.rotZ + sway * 0.3);
+      } else {
+        // radial petal: distribute around the head, tilt from bud to open
+        const tilt = this.closeExtra * DEG * (1 - unfold) + this.openBase * DEG + p.tiltBias + wilt * 40 * DEG;
+        m.position.set(0, 0, p.z * petalLen);
+        if (petal.detached) m.position.y -= petal.fallProgress * petalLen * 2.5;
+        m.rotation.set(0, 0, 0);
+        m.rotateZ(p.angle + sway * 0.5);
+        m.rotateX(tilt + sway);
+      }
       m.scale.setScalar(scale);
       m.visible = scale > 1e-4;
 
@@ -244,12 +302,11 @@ export class Flower {
       this.particlePos[idx * 3] = origin.x + (Math.random() - 0.5) * handScale;
       this.particlePos[idx * 3 + 1] = origin.y + (Math.random() - 0.5) * handScale;
       this.particlePos[idx * 3 + 2] = origin.z + (Math.random() - 0.5) * handScale * 0.5;
-      // gentle spill: soft outward drift, then gravity carries it down like water
       this.particleVelocities[idx * 3] = (Math.random() - 0.5) * 0.1;
       this.particleVelocities[idx * 3 + 1] = Math.random() * 0.04;
       this.particleVelocities[idx * 3 + 2] = (Math.random() - 0.5) * 0.06;
       this.particleAges[idx] = 0;
-      this.particleSize[idx] = handScale * (0.2 + Math.random() * 0.26); // world-space glow radius (smaller)
+      this.particleSize[idx] = handScale * (0.2 + Math.random() * 0.26);
     }
   }
 
@@ -270,14 +327,13 @@ export class Flower {
         continue;
       }
       anyAlive = true;
-      this.particleVelocities[i * 3 + 1]! -= 9.8 * dt * 0.04; // gravity, fluid fall
-      this.particleVelocities[i * 3]! *= 0.98; // drag, so it flows rather than shoots
+      this.particleVelocities[i * 3 + 1]! -= 9.8 * dt * 0.04;
+      this.particleVelocities[i * 3]! *= 0.98;
       this.particleVelocities[i * 3 + 2]! *= 0.98;
       this.particlePos[i * 3]! += this.particleVelocities[i * 3]! * dt;
       this.particlePos[i * 3 + 1]! += this.particleVelocities[i * 3 + 1]! * dt;
       this.particlePos[i * 3 + 2]! += this.particleVelocities[i * 3 + 2]! * dt;
 
-      // fade in fast, ebb out slowly (a droplet of light), swell slightly as it goes
       const life = age / PARTICLE_LIFETIME_S;
       this.particleAlphaAttr.setX(i, Math.min(1, age / 0.15) * (1 - life) * (1 - life));
       const size = this.particleSize[i]! * (0.7 + life * 0.6);
@@ -296,17 +352,23 @@ export class Flower {
   dispose(): void {
     for (const p of this.petals) p.mesh.geometry.dispose();
     this.mat.dispose();
-    this.center.geometry.dispose();
-    this.stem.geometry.dispose();
-    this.stem.material.dispose();
+    if (this.center) {
+      const anyCenter = this.center as unknown as { geometry?: THREE.BufferGeometry };
+      anyCenter.geometry?.dispose();
+    }
+    this.centerMat?.dispose();
+    if (this.stem) {
+      this.stem.geometry.dispose();
+      this.stem.material.dispose();
+    }
     this.particles.geometry.dispose();
     this.particleMaterial.dispose();
   }
 }
 
-/** A thin, curved, slightly irregular petal; UVs sample a radial wedge of the photo. */
+/** A curved petal from a PetalShape; UVs sample a radial wedge of the selfie. */
 function buildPetalGeometry(
-  sharp: number,
+  shape: PetalShape,
   angle: number,
   wedge: number,
   rMax: number,
@@ -315,8 +377,6 @@ function buildPetalGeometry(
   const SU = 14;
   const SV = 8;
   const wavePhase = rand() * Math.PI * 2;
-  const waveAmp = 0.08 + rand() * 0.1;
-  const curlAmt = 0.3 + (rand() - 0.5) * 0.18;
   const twist = (rand() - 0.5) * 0.14;
   const positions: number[] = [];
   const uvs: number[] = [];
@@ -324,15 +384,18 @@ function buildPetalGeometry(
 
   for (let i = 0; i <= SU; i++) {
     const u = i / SU;
-    const wave = 1 + waveAmp * Math.sin(u * 7 + wavePhase);
-    const width = Math.pow(Math.sin(Math.PI * u), sharp) * wave;
+    const taper = Math.pow(Math.sin(Math.PI * u), shape.sharp);
+    const strapW = smoothstep(0, 0.12, u) * (1 - smoothstep(0.72, 1.0, u));
+    const profile = taper * (1 - shape.strap) + strapW * shape.strap;
+    const wave = 1 + shape.waveAmp * Math.sin(u * shape.waveFreq + wavePhase);
+    const width = profile * wave;
     for (let j = 0; j <= SV; j++) {
       const v = j / SV;
       const vv = v * 2 - 1;
-      const x = vv * 0.3 * width + twist * u; // thinner (0.3) for delicacy
+      const x = vv * shape.width * width + twist * u;
       const y = u;
-      const curlTip = curlAmt * u * u;
-      const cup = 0.3 * vv * vv * width;
+      const curlTip = shape.curl * u * u;
+      const cup = shape.cup * vv * vv * width;
       positions.push(x, y, curlTip + cup);
 
       const r = rMax * u;
@@ -356,11 +419,7 @@ function buildPetalGeometry(
   return geo;
 }
 
-/**
- * A thin, irregular, twisting organic tendril from the flower base (y=0) toward
- * the hand (y=-1): a bezier spine with a tapering wiggle and a slow helical
- * twist, and slightly uneven thickness, so it reads as alive rather than a tube.
- */
+/** A thin, irregular, twisting organic tendril from the flower base toward the hand. */
 function buildStemGeometry(rand: () => number): THREE.BufferGeometry {
   const N = 22;
   const M = 6;
@@ -369,7 +428,6 @@ function buildStemGeometry(rand: () => number): THREE.BufferGeometry {
   const ctrl = new THREE.Vector3(bendX * 0.5 + (rand() - 0.5) * 0.2, -0.5, bendZ * 0.5);
   const p0 = new THREE.Vector3(0, 0, 0);
   const p1 = new THREE.Vector3(bendX, -1, bendZ);
-
   const wf1 = 6 + rand() * 5;
   const wf2 = 8 + rand() * 6;
   const wph1 = rand() * 6.28;
@@ -377,17 +435,16 @@ function buildStemGeometry(rand: () => number): THREE.BufferGeometry {
   const wAmpX = 0.03 + rand() * 0.035;
   const wAmpZ = 0.03 + rand() * 0.035;
   const twist = (rand() - 0.5) * 5;
-
   const positions: number[] = [];
   const indices: number[] = [];
   for (let i = 0; i <= N; i++) {
     const t = i / N;
     const mt = 1 - t;
-    const env = Math.sin(Math.PI * t); // wiggle vanishes at both ends
+    const env = Math.sin(Math.PI * t);
     const cx = mt * mt * p0.x + 2 * mt * t * ctrl.x + t * t * p1.x + Math.sin(t * wf1 + wph1) * wAmpX * env;
     const cy = mt * mt * p0.y + 2 * mt * t * ctrl.y + t * t * p1.y;
     const cz = mt * mt * p0.z + 2 * mt * t * ctrl.z + t * t * p1.z + Math.cos(t * wf2 + wph2) * wAmpZ * env;
-    const radius = (0.014 + t * 0.03) * (0.82 + Math.abs(Math.sin(t * 9 + wph1)) * 0.36); // thin at flower, uneven
+    const radius = (0.014 + t * 0.03) * (0.82 + Math.abs(Math.sin(t * 9 + wph1)) * 0.36);
     const tw = twist * t;
     for (let m = 0; m <= M; m++) {
       const ang = (m / M) * Math.PI * 2 + tw;
@@ -408,7 +465,6 @@ function buildStemGeometry(rand: () => number): THREE.BufferGeometry {
   return geo;
 }
 
-/** Remap a unit CircleGeometry's UVs to a small central disc of the photo. */
 function remapCircleUvToPhotoCenter(geo: THREE.CircleGeometry, radius: number): void {
   const pos = geo.attributes.position as THREE.BufferAttribute;
   const uv = geo.attributes.uv as THREE.BufferAttribute;
