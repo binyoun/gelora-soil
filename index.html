@@ -100,6 +100,18 @@
     }
     #shutter-fallback:active { transform: translateX(-50%) scale(0.94); }
 
+    /* Pulse-ground altar chrome (only in ?altar=1 mode). */
+    #pulse { display: none; position: absolute; left: 50%; bottom: max(4%, env(safe-area-inset-bottom));
+      transform: translateX(-50%); z-index: 8; align-items: center; gap: 0.6rem; }
+    #app.altar #pulse { display: flex; }
+    #pulse-connect {
+      min-height: 34px; padding: 0 1em; border-radius: 17px;
+      border: 1px solid var(--line); background: rgba(0, 0, 0, 0.32);
+      color: var(--ink); font-family: var(--sans); font-size: 0.72rem;
+      letter-spacing: 0.14em; text-transform: lowercase;
+    }
+    #pulse-read { font-size: 0.72rem; letter-spacing: 0.12em; color: var(--muted); text-shadow: var(--shadow); }
+
     #camera-toggle {
       position: absolute; top: max(4%, env(safe-area-inset-top)); right: 5%;
       min-width: 44px; height: 30px; padding: 0 0.7em; border-radius: 16px;
@@ -208,6 +220,11 @@
       <button id="camera-toggle" aria-label="toggle camera">flip</button>
       <button id="shutter-fallback" aria-label="capture now"></button>
     </section>
+
+    <div id="pulse">
+      <button id="pulse-connect" aria-label="connect pulse sensor">connect pulse</button>
+      <span id="pulse-read"></span>
+    </div>
 
     <div id="landing">
       <h1 id="landing-title">vanitas</h1>

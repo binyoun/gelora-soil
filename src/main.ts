@@ -6,6 +6,7 @@ import { buildHandState } from './hand/gestures';
 import { initHandLandmarker, detectHands } from './hand/landmarker';
 import { PalmStabilityTracker, type RawLandmark } from './hand/palm';
 import { GrowthEngine } from './growth/engine';
+import { PulseSensor } from './sensors/pulse';
 import { Flower } from './growth/flower';
 import { TEMPLATES, type FlowerTemplate } from './growth/flowerTemplates';
 import { Roots } from './growth/roots';
@@ -33,6 +34,8 @@ const stageCaptureSection = document.getElementById('stage-capture')!;
 const cameraToggleButton = document.getElementById('camera-toggle') as HTMLButtonElement;
 const shutterFallbackButton = document.getElementById('shutter-fallback') as HTMLButtonElement;
 const promptEl = document.getElementById('prompt')!;
+const pulseConnectButton = document.getElementById('pulse-connect') as HTMLButtonElement;
+const pulseReadEl = document.getElementById('pulse-read')!;
 const captureRing = document.getElementById('capture-ring') as unknown as SVGSVGElement;
 const captureRingProg = captureRing.querySelector('.prog') as SVGCircleElement;
 const palmRing = document.getElementById('palm-ring') as unknown as SVGSVGElement;
@@ -59,6 +62,12 @@ const EMPTY_HAND: HandState = {
 };
 
 const AUTO_CAPTURE_SECONDS = 3; // selfie self-timer
+
+// Pulse-ground altar (Øryn 맥): ?altar=1 runs the fixed-camera installation mode.
+// A physical pulse sensor drives growth; the camera is a fixed rig, not held, so
+// it is not mirrored. Without a board the simulated pulse keeps it running.
+const ALTAR_MODE = new URLSearchParams(window.location.search).get('altar') === '1';
+const pulse = new PulseSensor();
 
 const camera = new Camera(videoEl);
 const arScene = new ARScene(sceneCanvas);
@@ -105,7 +114,9 @@ async function begin(): Promise<void> {
   if (!cameraReady) {
     landingEl.classList.add('loading');
     try {
-      await camera.start('user'); // front camera: the selfie becomes the flower
+      // front camera: the selfie becomes the flower. Altar mode uses a fixed rig
+      // (rear/environment), not held, so it is not mirrored.
+      await camera.start(ALTAR_MODE ? 'environment' : 'user');
       await Promise.all([initHandLandmarker(), initSegmenter()]);
     } catch (err) {
       console.error(err);
@@ -156,6 +167,27 @@ function applyVideoMetrics(): void {
 backButton.addEventListener('click', () => {
   if (mode === 'ar') goBack();
 });
+
+// Pulse-ground altar: reveal the connect chip and wire it. Web Serial requires a
+// user gesture, so connection happens on this tap. Unsupported browsers (iOS
+// Safari) keep the simulated pulse; the button just reports it.
+if (ALTAR_MODE) {
+  appEl.classList.add('altar');
+  if (!pulse.supported) pulseConnectButton.textContent = 'pulse: simulated';
+  pulseConnectButton.addEventListener('click', () => {
+    if (!pulse.supported) return;
+    pulseConnectButton.textContent = 'connecting';
+    pulse
+      .connect()
+      .then((ok) => {
+        pulseConnectButton.textContent = ok ? 'pulse: live' : 'connect pulse';
+      })
+      .catch((err) => {
+        console.error(err);
+        pulseConnectButton.textContent = 'connect pulse';
+      });
+  });
+}
 
 // Landing: swipe left/right (or tap the chevrons) to change flower; tap to begin.
 function changeFlower(delta: number): void {
@@ -416,11 +448,19 @@ function loop(nowMs: number): void {
     captureCountdownStartMs = null;
   }
 
+  // Advance the pulse every frame so its phase stays coherent; feed it into
+  // growth only in altar mode, or whenever a real board is actually live.
+  const cardiac = pulse.update(dtSeconds);
+  const cardiacIn = ALTAR_MODE || pulse.isLive ? cardiac : null;
+  if (ALTAR_MODE) {
+    pulseReadEl.textContent = `${Math.round(cardiac.bpm)} bpm ${cardiac.live ? '' : '(sim)'}`.trim();
+  }
+
   let maturity = 0;
   let pouredOut = false;
   if (growthEngine) {
     if (stageMachine.growthGateOpen) {
-      growthEngine.tick(hand, dtSeconds);
+      growthEngine.tick(hand, dtSeconds, cardiacIn);
     }
     const state = growthEngine.getState();
     maturity = state.maturity;

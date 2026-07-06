@@ -34,6 +34,19 @@ export interface HandState {
   secondHandTip: Vec3 | null;
 }
 
+// A cardiac reading from the pulse-ground altar (Øryn 맥). Separate from
+// HandState: it comes from a physical pulse sensor, not the camera. When no
+// board is connected it is synthesised (see PulseSensor) so the piece runs the
+// same without hardware. Nothing is stored; the signal exists only in the moment.
+export interface CardiacState {
+  present: boolean; // a pulse source is active (real board or simulated)
+  live: boolean; // a real board is connected (false = simulated fallback)
+  bpm: number;
+  phase: number; // 0..1 within the current beat, for petal breathing
+  calm: number; // 0..1, heart rate settled and slow: care made measurable
+  beat: boolean; // a beat edge occurred on this frame (for haptic/visual echo)
+}
+
 export interface MutationEvent {
   petalIndex: number;
   hueShift: number;

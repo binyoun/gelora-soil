@@ -1,4 +1,4 @@
-import type { FlowerDNA, GrowthState, HandState, PetalState, Vec3 } from '../types';
+import type { CardiacState, FlowerDNA, GrowthState, HandState, PetalState, Vec3 } from '../types';
 import { distance } from '../util/vec3';
 import { MutationField } from './mutate';
 
@@ -7,6 +7,13 @@ import { MutationField } from './mutate';
 
 const STABILITY_GROWTH_FLOOR = 0.08;
 const STABILITY_GROWTH_CEIL = 0.5;
+// Pulse-ground altar (Øryn 맥): when a cardiac reading is present, care is
+// stillness AND a settled pulse. A calm heart lets the flower root faster; an
+// agitated one holds it back. CARDIAC_FLOOR keeps growth possible even before
+// the pulse settles, so the term modulates rather than gates outright.
+const CARDIAC_CALM_FLOOR = 0.15;
+const CARDIAC_CALM_CEIL = 0.85;
+const CARDIAC_FLOOR = 0.35; // growth multiplier at zero calm (still grows, slowly)
 // Fast emergence (roots + first relief within ~1s), then a long slow climb so the
 // bloom unfolds over tens of seconds. Play time is the point.
 const EMERGE_MATURITY = 0.15;
@@ -67,12 +74,16 @@ export class GrowthEngine {
     return this.detachedRatio > 0.5;
   }
 
-  /** Advances growth by dtSeconds given the current DNA and per-frame hand reading. */
-  tick(hand: HandState, dtSeconds: number): GrowthState {
+  /**
+   * Advances growth by dtSeconds given the current DNA and per-frame hand reading.
+   * `cardiac` is the optional pulse-ground reading (Øryn 맥); when null the engine
+   * behaves exactly as the camera-only version.
+   */
+  tick(hand: HandState, dtSeconds: number, cardiac: CardiacState | null = null): GrowthState {
     const s = this.state;
     s.age += dtSeconds;
 
-    this.advanceMaturity(hand, dtSeconds);
+    this.advanceMaturity(hand, dtSeconds, cardiac);
     this.advanceWilt(hand, dtSeconds);
     this.advancePour(hand, dtSeconds);
     this.advanceBloom(hand, dtSeconds);
@@ -80,9 +91,15 @@ export class GrowthEngine {
     return s;
   }
 
-  private advanceMaturity(hand: HandState, dt: number): void {
+  private advanceMaturity(hand: HandState, dt: number, cardiac: CardiacState | null): void {
     const s = this.state;
-    const growthFactor = smoothstep(STABILITY_GROWTH_FLOOR, STABILITY_GROWTH_CEIL, hand.stability);
+    let growthFactor = smoothstep(STABILITY_GROWTH_FLOOR, STABILITY_GROWTH_CEIL, hand.stability);
+    if (cardiac && cardiac.present) {
+      // Care is stillness and a settled pulse together: the calmer the heart,
+      // the closer the cardiac term rises to 1.
+      const calmFactor = smoothstep(CARDIAC_CALM_FLOOR, CARDIAC_CALM_CEIL, cardiac.calm);
+      growthFactor *= CARDIAC_FLOOR + (1 - CARDIAC_FLOOR) * calmFactor;
+    }
     const rate = (s.maturity < EMERGE_MATURITY ? EMERGE_RATE : BLOOM_RATE) * growthFactor;
     // Asymptotic approach toward 1: growth never reverses, jitter only slows it toward zero.
     s.maturity += (1 - s.maturity) * rate * dt;
