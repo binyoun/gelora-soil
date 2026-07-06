@@ -6,8 +6,8 @@ import type { FlowerTemplate, PetalShape } from './flowerTemplates';
 
 const PETAL_LEN_PER_HAND = 2.5;
 const LIFT_PER_HAND = 2.0;
-const MAX_PARTICLES = 320;
-const PARTICLE_LIFETIME_S = 2.6;
+const MAX_PARTICLES = 440;
+const PARTICLE_LIFETIME_S = 5.0; // long enough to trail down to the bottom
 const FLAKE_UV_PATCH = 0.16; // each residue flake samples this fraction of the photo
 const DEG = Math.PI / 180;
 
@@ -346,19 +346,20 @@ export class Flower {
   }
 
   private spawnBurst(origin: THREE.Vector3, handScale: number): void {
-    for (let k = 0; k < 14; k++) {
+    for (let k = 0; k < 16; k++) {
       const idx = this.nextParticle;
       this.nextParticle = (this.nextParticle + 1) % MAX_PARTICLES;
       this.particlePos[idx * 3] = origin.x + (Math.random() - 0.5) * handScale;
       this.particlePos[idx * 3 + 1] = origin.y + (Math.random() - 0.5) * handScale;
       this.particlePos[idx * 3 + 2] = origin.z + (Math.random() - 0.5) * handScale * 0.5;
-      this.particleVelocities[idx * 3] = (Math.random() - 0.5) * 0.1;
-      this.particleVelocities[idx * 3 + 1] = Math.random() * 0.04;
-      this.particleVelocities[idx * 3 + 2] = (Math.random() - 0.5) * 0.06;
+      // gentle drift, gravity does the falling slowly
+      this.particleVelocities[idx * 3] = (Math.random() - 0.5) * 0.06;
+      this.particleVelocities[idx * 3 + 1] = Math.random() * 0.02 - 0.01;
+      this.particleVelocities[idx * 3 + 2] = (Math.random() - 0.5) * 0.04;
       this.particleAges[idx] = 0;
-      this.particleSize[idx] = handScale * (0.3 + Math.random() * 0.36); // bigger so the photo patch reads
-      this.particleSpin[idx] = (Math.random() - 0.5) * 3.0; // tumble rate
-      // a patch of the photo, biased to the centre where the subject is
+      // mixed sizes: mostly fine dust, occasional larger flake (squared random)
+      this.particleSize[idx] = handScale * (0.09 + Math.random() * Math.random() * 0.78);
+      this.particleSpin[idx] = (Math.random() - 0.5) * 2.4;
       this.particleUvAttr.setXY(idx, 0.24 + Math.random() * 0.44, 0.24 + Math.random() * 0.44);
     }
     this.particleUvAttr.needsUpdate = true;
@@ -381,17 +382,18 @@ export class Flower {
         continue;
       }
       anyAlive = true;
-      this.particleVelocities[i * 3 + 1]! -= 9.8 * dt * 0.04;
-      this.particleVelocities[i * 3]! *= 0.98;
-      this.particleVelocities[i * 3 + 2]! *= 0.98;
+      const spin = this.particleSpin[i]!;
+      this.particleVelocities[i * 3 + 1]! -= 9.8 * dt * 0.018; // slow fall
+      this.particleVelocities[i * 3]! += Math.sin(age * 2.0 + spin * 5.0) * 0.02 * dt; // flutter, meandering trail
+      this.particleVelocities[i * 3]! *= 0.99;
+      this.particleVelocities[i * 3 + 2]! *= 0.99;
       this.particlePos[i * 3]! += this.particleVelocities[i * 3]! * dt;
       this.particlePos[i * 3 + 1]! += this.particleVelocities[i * 3 + 1]! * dt;
       this.particlePos[i * 3 + 2]! += this.particleVelocities[i * 3 + 2]! * dt;
 
       const life = age / PARTICLE_LIFETIME_S;
-      this.particleAlphaAttr.setX(i, Math.min(1, age / 0.12) * (1 - life) * (1 - life));
+      this.particleAlphaAttr.setX(i, Math.min(1, age / 0.15) * Math.pow(1 - life, 1.4));
       const size = this.particleSize[i]! * (0.9 + life * 0.2);
-      const spin = this.particleSpin[i]!;
       this.particleDummy.position.set(this.particlePos[i * 3]!, this.particlePos[i * 3 + 1]!, this.particlePos[i * 3 + 2]!);
       this.particleDummy.scale.setScalar(size);
       this.particleDummy.rotation.set(age * spin * 0.6, age * spin * 0.8, age * spin); // tumble like falling ash
