@@ -17,6 +17,7 @@ varying vec2 vGlitchUv;
 uniform float uGlitch;
 uniform float uWobble;
 uniform float uTime;
+float glitchHash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 `;
 
 const VERT_PATCH = `
@@ -27,6 +28,11 @@ vGlitchUv = uv;
           * sin(position.y * 18.0 - uTime * 4.0)
           * sin(position.z * 26.0 + uTime * 6.0);
   transformed += normal * n * uGlitch * uWobble;
+  vec2 gb = floor(vGlitchUv * 5.0);
+  float gt = floor(uTime * 12.0);
+  float gj = step(0.72, glitchHash(gb + gt)) * uGlitch;
+  transformed.x += (glitchHash(gb + gt + 3.0) - 0.5) * gj * 0.12;
+  transformed.y += (glitchHash(gb + gt + 7.0) - 0.5) * gj * 0.065;
 }
 `;
 

@@ -357,8 +357,8 @@ export class Flower {
       this.particleVelocities[idx * 3 + 1] = Math.random() * 0.02 - 0.01;
       this.particleVelocities[idx * 3 + 2] = (Math.random() - 0.5) * 0.04;
       this.particleAges[idx] = 0;
-      // mixed sizes: mostly fine dust, occasional larger flake (squared random)
-      this.particleSize[idx] = handScale * (0.09 + Math.random() * Math.random() * 0.78);
+      // mixed sizes: mostly fine dust, occasional larger flake (squared random), 20% bigger
+      this.particleSize[idx] = handScale * 1.2 * (0.09 + Math.random() * Math.random() * 0.78);
       this.particleSpin[idx] = (Math.random() - 0.5) * 2.4;
       this.particleUvAttr.setXY(idx, 0.24 + Math.random() * 0.44, 0.24 + Math.random() * 0.44);
     }
