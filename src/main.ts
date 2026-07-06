@@ -104,6 +104,7 @@ let lastFrameMs = performance.now();
 let mode: 'landing' | 'ar' = 'landing';
 let cameraReady = false;
 let starting = false;
+let switchingCamera = false; // altar: guards the face<->hand camera swap
 let flowerIndex = 0;
 let preview: Flower | null = null;
 const previewDna = makeDummyDna();
@@ -121,9 +122,11 @@ async function begin(): Promise<void> {
   if (!cameraReady) {
     landingEl.classList.add('loading');
     try {
-      // front camera: the selfie becomes the flower. Altar mode uses a fixed rig
-      // (rear/environment), not held, so it is not mirrored.
-      await camera.start(ALTAR_MODE ? 'environment' : 'user');
+      // Front camera: the visitor's portrait becomes the flower. Altar mode also
+      // captures the face on the front camera first, then switches to the fixed
+      // hand camera after capture (see runCapturePipeline), so the petals still
+      // wear a portrait rather than a picture of the hand.
+      await camera.start('user');
       await Promise.all([initHandLandmarker(), initSegmenter()]);
     } catch (err) {
       console.error(err);
@@ -169,6 +172,21 @@ function applyVideoMetrics(): void {
   videoEl.classList.toggle('mirrored', mirror);
   const aspect = videoEl.videoWidth && videoEl.videoHeight ? videoEl.videoWidth / videoEl.videoHeight : 16 / 9;
   arScene.setVideoMetrics(aspect, mirror);
+}
+
+/** Altar: switch the live camera between the face (front) and hand (fixed) rigs.
+    Idempotent and guarded so it is safe to call every frame. */
+async function ensureFacing(facing: 'user' | 'environment'): Promise<void> {
+  if (camera.currentFacing === facing || switchingCamera) return;
+  switchingCamera = true;
+  try {
+    await camera.start(facing);
+    applyVideoMetrics();
+  } catch (err) {
+    console.error(err);
+  } finally {
+    switchingCamera = false;
+  }
 }
 
 backButton.addEventListener('click', () => {
@@ -351,6 +369,10 @@ async function runCapturePipeline(pinchPoint: { x: number; y: number }): Promise
   arScene.beginReveal(captureTexture, matted.width / matted.height);
   revealStartMs = performance.now();
 
+  // Altar: the face was just captured on the front camera; switch to the fixed
+  // hand camera so growth tracks the offered palm (the flower keeps the portrait).
+  if (ALTAR_MODE) await ensureFacing('environment');
+
   await wait(1500);
 
   capturing = false;
@@ -444,12 +466,21 @@ function loop(nowMs: number): void {
   const mirror = camera.currentFacing === 'user';
 
   if (stageMachine.stage === 'CAPTURE' && !capturing) {
-    // selfie self-timer: auto-capture after the countdown, or immediately on tap
-    if (captureCountdownStartMs === null) captureCountdownStartMs = nowMs;
-    const elapsed = (nowMs - captureCountdownStartMs) / 1000;
-    const timedOut = elapsed >= AUTO_CAPTURE_SECONDS;
-    if (timedOut || consumeManualTrigger()) {
-      runCapturePipeline({ x: 0.5, y: 0.5 }).catch((err) => console.error(err)); // selfie is centered
+    // Altar: the portrait is a face, so capture on the front camera. Hold the
+    // timer until the front camera is actually live (e.g. after a restart that
+    // was still on the hand camera).
+    if (ALTAR_MODE) void ensureFacing('user');
+    const camReady = !ALTAR_MODE || (camera.currentFacing === 'user' && !switchingCamera);
+    if (!camReady) {
+      captureCountdownStartMs = null;
+    } else {
+      // selfie self-timer: auto-capture after the countdown, or immediately on tap
+      if (captureCountdownStartMs === null) captureCountdownStartMs = nowMs;
+      const elapsed = (nowMs - captureCountdownStartMs) / 1000;
+      const timedOut = elapsed >= AUTO_CAPTURE_SECONDS;
+      if (timedOut || consumeManualTrigger()) {
+        runCapturePipeline({ x: 0.5, y: 0.5 }).catch((err) => console.error(err)); // selfie is centered
+      }
     }
   } else if (stageMachine.stage !== 'CAPTURE') {
     captureCountdownStartMs = null;
