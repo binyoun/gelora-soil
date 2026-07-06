@@ -166,7 +166,7 @@ export class Flower {
       { shape: { ...b, width: 0.07, sharp: 2.1, strap: 0.15, bend: 0.28 }, angleDeg: 150, rotZDeg: 60, pos: [0, 0.03, 0.03], scale: 1.0, sway: 0.13 }, // lateral (up-left)
       { shape: { ...b, width: 0.07, sharp: 2.1, strap: 0.15, bend: -0.28 }, angleDeg: 30, rotZDeg: -60, pos: [0, 0.03, 0.03], scale: 1.0, sway: 0.13 }, // lateral (up-right)
       // the lip (labellum): broad, cupped, softly waved
-      { shape: { ...b, width: 0.4, sharp: 0.95, cup: 0.52, waveAmp: 0.06, waveFreq: 6, curl: 0.12 }, angleDeg: 270, rotZDeg: 180, pos: [0, -0.03, 0.05], scale: 1.05, sway: 0.06 }, // lip (down)
+      { shape: { ...b, width: 0.44, sharp: 0.9, cup: 0.72, waveAmp: 0.06, waveFreq: 6, curl: 0.2, bulge: 0.42 }, angleDeg: 270, rotZDeg: 180, pos: [0, -0.03, 0.05], scale: 1.12, sway: 0.06 }, // lip (down): voluminous pouch
       // the two long curling tails ("frog legs"), the signature of the ghost orchid
       { shape: { ...b, width: 0.032, sharp: 1.0, strap: 0.85, curl: 0.04, bend: -0.55 }, angleDeg: 250, rotZDeg: 180 - 20, pos: [-0.02, -0.14, 0.0], scale: 1.85, sway: 0.28 }, // tail (left)
       { shape: { ...b, width: 0.032, sharp: 1.0, strap: 0.85, curl: 0.04, bend: 0.55 }, angleDeg: 290, rotZDeg: 180 + 20, pos: [0.02, -0.14, 0.0], scale: 1.85, sway: 0.28 }, // tail (right)
@@ -389,6 +389,7 @@ function buildPetalGeometry(
   const wavePhase = rand() * Math.PI * 2;
   const twist = (rand() - 0.5) * 0.14;
   const bend = shape.bend ?? 0;
+  const bulge = shape.bulge ?? 0;
   const positions: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
@@ -408,7 +409,8 @@ function buildPetalGeometry(
       const y = u;
       const curlTip = shape.curl * u * u;
       const cup = shape.cup * vv * vv * width;
-      positions.push(x, y, curlTip + cup);
+      const puff = bulge * Math.sin(Math.PI * u) * (1 - vv * vv); // dome outward at centre for volume
+      positions.push(x, y, curlTip + cup + puff);
 
       const r = rMax * u;
       const a = angle + (v - 0.5) * wedge;
