@@ -7,7 +7,8 @@ import type { FlowerTemplate, PetalShape } from './flowerTemplates';
 const PETAL_LEN_PER_HAND = 2.5;
 const LIFT_PER_HAND = 2.0;
 const MAX_PARTICLES = 320;
-const PARTICLE_LIFETIME_S = 2.4;
+const PARTICLE_LIFETIME_S = 2.6;
+const FLAKE_UV_PATCH = 0.16; // each residue flake samples this fraction of the photo
 const DEG = Math.PI / 180;
 
 interface PetalParam {
@@ -47,7 +48,9 @@ export class Flower {
   private particleVelocities: Float32Array;
   private particleAges: Float32Array;
   private particleSize: Float32Array;
+  private particleSpin: Float32Array;
   private particleAlphaAttr: THREE.InstancedBufferAttribute;
+  private particleUvAttr: THREE.InstancedBufferAttribute;
   private particleMaterial: THREE.ShaderMaterial;
   private particleDummy = new THREE.Object3D();
   private nextParticle = 0;
@@ -99,36 +102,47 @@ export class Flower {
     this.particleVelocities = new Float32Array(MAX_PARTICLES * 3);
     this.particleAges = new Float32Array(MAX_PARTICLES).fill(Infinity);
     this.particleSize = new Float32Array(MAX_PARTICLES);
+    this.particleSpin = new Float32Array(MAX_PARTICLES);
 
+    // Image-based residue: the flower crumbles into soft flakes, each showing a
+    // patch of the captured photo, tumbling and falling like ash (dust to dust).
     const quad = new THREE.PlaneGeometry(1, 1);
     this.particleAlphaAttr = new THREE.InstancedBufferAttribute(new Float32Array(MAX_PARTICLES), 1);
+    this.particleUvAttr = new THREE.InstancedBufferAttribute(new Float32Array(MAX_PARTICLES * 2), 2);
     quad.setAttribute('aAlpha', this.particleAlphaAttr);
+    quad.setAttribute('aUvOffset', this.particleUvAttr);
     this.particleMaterial = new THREE.ShaderMaterial({
-      uniforms: { uColor: { value: new THREE.Color(template.glowTint) } },
+      uniforms: { map: { value: photo }, uPatch: { value: FLAKE_UV_PATCH } },
       vertexShader: `
         attribute float aAlpha;
-        varying vec2 vUv;
+        attribute vec2 aUvOffset;
+        uniform float uPatch;
+        varying vec2 vMapUv;
+        varying vec2 vQuadUv;
         varying float vAlpha;
         void main() {
-          vUv = uv;
+          vQuadUv = uv;
+          vMapUv = aUvOffset + uv * uPatch;
           vAlpha = aAlpha;
           gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
         }
       `,
       fragmentShader: `
         precision mediump float;
-        uniform vec3 uColor;
-        varying vec2 vUv;
+        uniform sampler2D map;
+        varying vec2 vMapUv;
+        varying vec2 vQuadUv;
         varying float vAlpha;
         void main() {
-          float d = length(vUv - 0.5);
-          float glow = smoothstep(0.5, 0.0, d);
-          vec3 col = mix(uColor, vec3(1.0), glow * glow * 0.7);
-          gl_FragColor = vec4(col, glow * vAlpha);
+          vec4 tex = texture2D(map, vMapUv);
+          float edge = smoothstep(0.5, 0.22, length(vQuadUv - 0.5)); // soft round flake
+          float a = tex.a * edge * vAlpha;
+          if (a < 0.02) discard;
+          gl_FragColor = vec4(tex.rgb, a);
         }
       `,
       transparent: true,
-      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
       depthWrite: false,
     });
     this.particles = new THREE.InstancedMesh(quad, this.particleMaterial, MAX_PARTICLES);
@@ -332,7 +346,7 @@ export class Flower {
   }
 
   private spawnBurst(origin: THREE.Vector3, handScale: number): void {
-    for (let k = 0; k < 18; k++) {
+    for (let k = 0; k < 14; k++) {
       const idx = this.nextParticle;
       this.nextParticle = (this.nextParticle + 1) % MAX_PARTICLES;
       this.particlePos[idx * 3] = origin.x + (Math.random() - 0.5) * handScale;
@@ -342,8 +356,12 @@ export class Flower {
       this.particleVelocities[idx * 3 + 1] = Math.random() * 0.04;
       this.particleVelocities[idx * 3 + 2] = (Math.random() - 0.5) * 0.06;
       this.particleAges[idx] = 0;
-      this.particleSize[idx] = handScale * (0.2 + Math.random() * 0.26);
+      this.particleSize[idx] = handScale * (0.3 + Math.random() * 0.36); // bigger so the photo patch reads
+      this.particleSpin[idx] = (Math.random() - 0.5) * 3.0; // tumble rate
+      // a patch of the photo, biased to the centre where the subject is
+      this.particleUvAttr.setXY(idx, 0.24 + Math.random() * 0.44, 0.24 + Math.random() * 0.44);
     }
+    this.particleUvAttr.needsUpdate = true;
   }
 
   private updateParticles(dt: number): void {
@@ -371,11 +389,12 @@ export class Flower {
       this.particlePos[i * 3 + 2]! += this.particleVelocities[i * 3 + 2]! * dt;
 
       const life = age / PARTICLE_LIFETIME_S;
-      this.particleAlphaAttr.setX(i, Math.min(1, age / 0.15) * (1 - life) * (1 - life));
-      const size = this.particleSize[i]! * (0.7 + life * 0.6);
+      this.particleAlphaAttr.setX(i, Math.min(1, age / 0.12) * (1 - life) * (1 - life));
+      const size = this.particleSize[i]! * (0.9 + life * 0.2);
+      const spin = this.particleSpin[i]!;
       this.particleDummy.position.set(this.particlePos[i * 3]!, this.particlePos[i * 3 + 1]!, this.particlePos[i * 3 + 2]!);
       this.particleDummy.scale.setScalar(size);
-      this.particleDummy.rotation.set(0, 0, 0);
+      this.particleDummy.rotation.set(age * spin * 0.6, age * spin * 0.8, age * spin); // tumble like falling ash
       this.particleDummy.updateMatrix();
       this.particles.setMatrixAt(i, this.particleDummy.matrix);
     }
