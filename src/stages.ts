@@ -24,6 +24,15 @@ export class StageMachine {
   private sowingStableSinceMs: number | null = null;
   private handLostSinceMs: number | null = null;
 
+  /** Return to a fresh CAPTURE (used when starting or returning from the landing). */
+  reset(): void {
+    this.stage = 'CAPTURE';
+    this.sowingCommitted = false;
+    this.sowingProgress = 0;
+    this.sowingStableSinceMs = null;
+    this.handLostSinceMs = null;
+  }
+
   update(input: StageInputs): Stage {
     switch (this.stage) {
       case 'CAPTURE':

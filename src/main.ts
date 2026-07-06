@@ -16,11 +16,20 @@ import type { FlowerDNA, HandState } from './types';
 import { DebugOverlay, FpsMonitor, isDebugEnabled } from './ui/debug';
 import { PromptUI, promptForStage } from './ui/prompts';
 
+const appEl = document.getElementById('app')!;
 const videoEl = document.getElementById('camera-feed') as HTMLVideoElement;
 const sceneCanvas = document.getElementById('scene') as HTMLCanvasElement;
 const debugCanvas = document.getElementById('debug-overlay') as HTMLCanvasElement;
-const permissionGate = document.getElementById('permission-gate')!;
-const permissionButton = document.getElementById('permission-request') as HTMLButtonElement;
+const landingEl = document.getElementById('landing')!;
+const beginButton = document.getElementById('begin') as HTMLButtonElement;
+const loaderEl = document.getElementById('loader')!;
+const backButton = document.getElementById('back') as HTMLButtonElement;
+const flowerNameEl = document.getElementById('flower-name')!;
+const flowerTagEl = document.getElementById('flower-tag')!;
+const flowerDotsEl = document.getElementById('flower-dots')!;
+const ctxEl = document.getElementById('context')!;
+const ctxNameEl = document.getElementById('ctx-name')!;
+const ctxStoryEl = document.getElementById('ctx-story')!;
 const stageCaptureSection = document.getElementById('stage-capture')!;
 const cameraToggleButton = document.getElementById('camera-toggle') as HTMLButtonElement;
 const shutterFallbackButton = document.getElementById('shutter-fallback') as HTMLButtonElement;
@@ -79,26 +88,59 @@ let pixelRatioHalved = false;
 let prevStage = stageMachine.stage;
 let lastFrameMs = performance.now();
 
+let mode: 'landing' | 'ar' = 'landing';
+let cameraReady = false;
+let preview: Flower | null = null;
+const previewDna = makeDummyDna();
+const previewGrowth = new GrowthEngine(previewDna);
+previewGrowth.getState().maturity = 0.86;
+const previewOrigin = new THREE.Vector3(-0.03, -0.3, -1.5);
+const PREVIEW_HAND_SCALE = 0.14;
+let placeholderTex: THREE.CanvasTexture | null = null;
+
 async function begin(): Promise<void> {
-  permissionButton.disabled = true;
-  // Show the capture controls (still hidden behind the opaque permission gate)
-  // so they are ready the moment the gate lifts.
-  stageCaptureSection.classList.add('active');
-  try {
-    await camera.start('user'); // front camera: the selfie becomes the flower (narcissus)
-  } catch (err) {
-    console.error(err);
-    permissionButton.disabled = false;
-    promptUI.set('camera access denied. reload to try again');
-    return;
+  if (!cameraReady) {
+    loaderEl.classList.add('active');
+    beginButton.classList.add('hidden');
+    try {
+      await camera.start('user'); // front camera: the selfie becomes the flower
+      await Promise.all([initHandLandmarker(), initSegmenter()]);
+    } catch (err) {
+      console.error(err);
+      loaderEl.classList.remove('active');
+      beginButton.classList.remove('hidden');
+      flowerNameEl.textContent = 'camera access denied';
+      return;
+    }
+    cameraReady = true;
+    applyVideoMetrics();
+    loaderEl.classList.remove('active');
+    beginButton.classList.remove('hidden');
   }
+  enterAR();
+}
 
-  await Promise.all([initHandLandmarker(), initSegmenter()]);
+function enterAR(): void {
+  mode = 'ar';
+  appEl.classList.remove('mode-landing');
+  appEl.classList.add('mode-ar');
+  landingEl.classList.add('hidden');
+  disposePreview();
+  resetToCapture();
+  stageMachine.reset();
+  prevStage = stageMachine.stage;
+}
 
-  applyVideoMetrics();
-  permissionGate.classList.add('hidden');
-
-  requestAnimationFrame(loop);
+function goBack(): void {
+  mode = 'landing';
+  appEl.classList.remove('mode-ar');
+  appEl.classList.add('mode-landing');
+  landingEl.classList.remove('hidden');
+  resetToCapture();
+  stageMachine.reset();
+  prevStage = stageMachine.stage;
+  ctxEl.classList.remove('show');
+  buildPreview();
 }
 
 /** Sync the DOM video mirror class and the scene's anchor metrics to the current camera. */
@@ -109,8 +151,12 @@ function applyVideoMetrics(): void {
   arScene.setVideoMetrics(aspect, mirror);
 }
 
-permissionButton.addEventListener('click', () => {
+beginButton.addEventListener('click', () => {
   begin().catch((err) => console.error(err));
+});
+
+backButton.addEventListener('click', () => {
+  if (mode === 'ar') goBack();
 });
 
 videoEl.addEventListener('loadedmetadata', applyVideoMetrics);
@@ -126,30 +172,80 @@ shutterFallbackButton.addEventListener('click', () => {
   manualShutterTrigger = true;
 });
 
-// Tap anywhere to begin again once the being has ended (no button, just the prompt).
-window.addEventListener('pointerdown', () => {
-  if (stageMachine.stage === 'ENDED') restartRequested = true;
+// Tap the AR view to begin again once the being has ended.
+sceneCanvas.addEventListener('pointerdown', () => {
+  if (mode === 'ar' && stageMachine.stage === 'ENDED') restartRequested = true;
 });
 
-// Landing-page flower chooser (built from the vanitas templates).
-const flowerChoices = document.getElementById('flower-choices')!;
-TEMPLATES.forEach((tpl, i) => {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'flower-choice' + (tpl === selectedTemplate ? ' selected' : '');
-  const name = document.createElement('span');
-  name.className = 'fc-name';
-  name.textContent = tpl.name;
-  const story = document.createElement('span');
-  story.className = 'fc-story';
-  story.textContent = tpl.story;
-  btn.append(name, story);
-  btn.addEventListener('click', () => {
-    selectedTemplate = tpl;
-    flowerChoices.querySelectorAll('.flower-choice').forEach((el, j) => el.classList.toggle('selected', j === i));
-  });
-  flowerChoices.appendChild(btn);
+// Minimal visual chooser: a dot per flower; selecting swaps the rotating preview.
+function selectFlower(i: number): void {
+  selectedTemplate = TEMPLATES[i]!;
+  flowerDotsEl.querySelectorAll('.dot').forEach((el, j) => el.classList.toggle('selected', j === i));
+  flowerNameEl.textContent = selectedTemplate.name;
+  flowerTagEl.textContent = tagFor(selectedTemplate.id);
+  buildPreview();
+}
+TEMPLATES.forEach((_, i) => {
+  const dot = document.createElement('button');
+  dot.type = 'button';
+  dot.className = 'dot';
+  dot.setAttribute('aria-label', TEMPLATES[i]!.name);
+  dot.addEventListener('click', () => selectFlower(i));
+  flowerDotsEl.appendChild(dot);
 });
+
+function tagFor(id: string): string {
+  switch (id) {
+    case 'tulip': return 'extinct';
+    case 'chrysanthemum': return 'the dead';
+    case 'kadupul': return 'one night only';
+    case 'ghost': return 'endangered';
+    default: return '';
+  }
+}
+
+function makeDummyDna(): FlowerDNA {
+  return { seed: 7, hueCenter: 42, hueSpread: 0.2, saturation: 0.25, luminance: 0.7, edgeComplexity: 0.5, aspect: 1, petalCount: 11, textureRegions: [] };
+}
+
+/** A neutral pale texture for the landing preview (no selfie yet). */
+function placeholderTexture(): THREE.CanvasTexture {
+  if (placeholderTex) return placeholderTex;
+  const S = 256;
+  const c = document.createElement('canvas');
+  c.width = c.height = S;
+  const ctx = c.getContext('2d')!;
+  const g = ctx.createRadialGradient(S / 2, S / 2, 4, S / 2, S / 2, S * 0.5);
+  g.addColorStop(0, '#f3ecdd');
+  g.addColorStop(0.6, '#cbb9a6');
+  g.addColorStop(1, '#6d6357');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(S / 2, S / 2, S * 0.49, 0, Math.PI * 2);
+  ctx.fill();
+  placeholderTex = new THREE.CanvasTexture(c);
+  placeholderTex.colorSpace = THREE.SRGBColorSpace;
+  return placeholderTex;
+}
+
+function buildPreview(): void {
+  disposePreview();
+  preview = new Flower(previewDna, placeholderTexture(), selectedTemplate);
+  arScene.overlayGroup.add(preview.group, preview.particles);
+}
+
+function disposePreview(): void {
+  if (!preview) return;
+  arScene.overlayGroup.remove(preview.group, preview.particles);
+  preview.dispose();
+  preview = null;
+}
+
+function showContext(): void {
+  ctxNameEl.textContent = selectedTemplate.name;
+  ctxStoryEl.textContent = selectedTemplate.story;
+  ctxEl.classList.add('show');
+}
 
 function freezeFrame(): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
@@ -221,6 +317,7 @@ function resetToCapture(): void {
   revealStartMs = null;
   captureCountdownStartMs = null;
   arScene.setRevealOpacity(0);
+  ctxEl.classList.remove('show');
   stabilityTracker.reset();
 }
 
@@ -261,6 +358,17 @@ function loop(nowMs: number): void {
   const dtSeconds = Math.min(0.1, (nowMs - lastFrameMs) / 1000);
   lastFrameMs = nowMs;
   fpsMonitor.tick(nowMs);
+
+  if (mode === 'landing') {
+    const t = nowMs / 1000;
+    if (preview) {
+      preview.update(previewDna, previewGrowth.getState(), previewOrigin, PREVIEW_HAND_SCALE, true, t, dtSeconds);
+      preview.group.rotation.y = Math.sin(t * 0.5) * 0.35; // gentle front-facing rock (overrides update)
+    }
+    arScene.render();
+    requestAnimationFrame(loop);
+    return;
+  }
 
   const result = videoEl.readyState >= 2 ? detectHands(videoEl, nowMs) : null;
   const primaryRaw: RawLandmark[] | null = result?.landmarks?.[0] ?? null;
@@ -331,7 +439,10 @@ function loop(nowMs: number): void {
   restartRequested = false;
 
   if (stage !== prevStage) {
-    if (stage === 'ENDED') enteredEndedAtMs = nowMs;
+    if (stage === 'ENDED') {
+      enteredEndedAtMs = nowMs;
+      showContext();
+    }
     if (stage === 'CAPTURE' && prevStage === 'ENDED') resetToCapture();
     prevStage = stage;
   }
@@ -374,3 +485,8 @@ function loop(nowMs: number): void {
   arScene.render();
   requestAnimationFrame(loop);
 }
+
+// Start on the landing with the first flower previewed and rotating.
+const startParam = new URLSearchParams(window.location.search).get('f');
+selectFlower(startParam ? Math.max(0, Math.min(TEMPLATES.length - 1, parseInt(startParam, 10))) : 0);
+requestAnimationFrame(loop);

@@ -18,20 +18,21 @@
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
     body { font-family: var(--sans); color: var(--ink); -webkit-font-smoothing: antialiased; }
 
-    #app { position: fixed; inset: 0; }
+    /* Dark, elegant ground for the landing preview; the camera covers it in AR. */
+    #app { position: fixed; inset: 0; background: radial-gradient(ellipse at 50% 40%, #191309 0%, #050505 72%); }
 
-    /* Fullscreen camera video background; transparent WebGL canvas on top. */
     video#camera-feed {
       position: fixed; inset: 0; width: 100%; height: 100%;
       object-fit: cover; z-index: 0; background: #000;
     }
     video#camera-feed.mirrored { transform: scaleX(-1); }
+    #app.mode-landing video#camera-feed { display: none; }
+
     canvas#scene {
       position: fixed; inset: 0; width: 100%; height: 100%;
       display: block; z-index: 1;
     }
 
-    /* Soft vignette for depth, over the feed but under the UI. */
     #vignette {
       position: fixed; inset: 0; z-index: 2; pointer-events: none;
       background: radial-gradient(ellipse at center, transparent 52%, rgba(0, 0, 0, 0.45) 100%);
@@ -42,7 +43,6 @@
       pointer-events: none; z-index: 5;
     }
 
-    /* Stage overlays cross-fade instead of hard cutting. */
     section {
       position: absolute; inset: 0; z-index: 6;
       opacity: 0; visibility: hidden; transition: opacity 0.6s ease;
@@ -50,6 +50,8 @@
     }
     section.active { opacity: 1; visibility: visible; }
     section button { pointer-events: auto; }
+    /* AR-only chrome hidden on the landing */
+    #app.mode-landing #stage-capture, #app.mode-landing #back { display: none; }
 
     #prompt {
       position: absolute; left: 0; right: 0; top: 12%;
@@ -59,7 +61,16 @@
       transition: opacity 0.45s ease; opacity: 1;
     }
 
-    /* Pinch-hold ring, centered, fills as the shutter pinch is held. */
+    /* After-AR context (shown at the ending). */
+    #context {
+      position: absolute; left: 0; right: 0; bottom: 20%;
+      text-align: center; padding: 0 2rem; z-index: 7; pointer-events: none;
+      opacity: 0; transition: opacity 0.7s ease;
+    }
+    #context.show { opacity: 1; }
+    #ctx-name { font-family: var(--serif); font-style: italic; font-size: 1.5rem; margin-bottom: 0.5rem; text-shadow: var(--shadow); }
+    #ctx-story { font-size: 0.86rem; font-weight: 300; line-height: 1.5; letter-spacing: 0.02em; color: var(--muted); text-shadow: var(--shadow); max-width: 22rem; margin: 0 auto; }
+
     #capture-ring {
       position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
       width: 110px; height: 110px; z-index: 7; pointer-events: none;
@@ -69,7 +80,6 @@
     #capture-ring .track { stroke: rgba(242, 239, 233, 0.22); stroke-width: 2; }
     #capture-ring .prog { stroke: var(--ink); stroke-width: 2.5; transition: stroke-dashoffset 0.08s linear; }
 
-    /* Palm-position ring, follows the tracked palm during the offer stage. */
     #palm-ring {
       position: absolute; left: 0; top: 0; width: 96px; height: 96px; z-index: 7;
       transform: translate(-50%, -50%); pointer-events: none; display: none;
@@ -98,62 +108,82 @@
       letter-spacing: 0.14em; text-transform: lowercase; z-index: 8;
     }
 
-    /* Onboarding. */
-    #permission-gate {
-      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-      text-align: center; padding: 1.8rem; z-index: 10;
-      background: radial-gradient(ellipse at center, #14110c 0%, #000 78%);
-      transition: opacity 0.8s ease;
+    /* Back to the landing (AR only). */
+    #back {
+      position: absolute; top: max(4%, env(safe-area-inset-top)); left: 5%;
+      height: 30px; padding: 0 0.9em 0 0.6em; border-radius: 16px;
+      border: 1px solid var(--line); background: rgba(0, 0, 0, 0.3);
+      color: var(--muted); font-family: var(--sans); font-size: 0.7rem;
+      letter-spacing: 0.12em; text-transform: lowercase; z-index: 9;
     }
-    #permission-gate.hidden { opacity: 0; pointer-events: none; }
-    #gate-inner { width: 100%; min-width: 0; max-width: 21.5rem; animation: rise 1.1s ease both; }
-    @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-    #gate-title {
-      font-family: var(--serif); font-style: italic; font-weight: 400;
-      font-size: 2.7rem; letter-spacing: 0.02em; margin: 0 0 1.1rem;
-    }
-    #gate-lead {
-      font-size: 1rem; font-weight: 300; line-height: 1.6; letter-spacing: 0.02em;
-      margin: 0 auto 1.6rem; color: var(--ink);
-    }
-    .rule { width: 34px; height: 1px; background: var(--line); margin: 0 auto 1.5rem; }
-    #gate-fine { font-size: 0.74rem; font-weight: 300; letter-spacing: 0.04em; color: var(--muted); margin: 0 0 2rem; line-height: 1.5; }
 
-    #gate-choose {
-      font-size: 0.72rem; font-weight: 300; letter-spacing: 0.14em; text-transform: uppercase;
-      color: var(--muted); margin: 0 0 0.8rem;
+    /* Immersive landing: transparent overlay over the rotating 3D preview. */
+    #landing {
+      position: absolute; inset: 0; z-index: 10; pointer-events: none;
+      display: flex; flex-direction: column; align-items: center; text-align: center;
+      padding: max(7%, env(safe-area-inset-top)) 1.4rem max(6%, env(safe-area-inset-bottom));
+      transition: opacity 0.7s ease;
     }
-    #flower-choices {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin: 0 0 1.6rem;
+    #landing.hidden { opacity: 0; pointer-events: none; }
+    #landing > * { pointer-events: auto; }
+    #landing-title {
+      font-family: var(--serif); font-style: italic; font-weight: 400;
+      font-size: 2.5rem; letter-spacing: 0.03em; margin: 0;
+      animation: rise 1.1s ease both;
     }
-    .flower-choice {
-      display: block; text-align: left; cursor: pointer; min-width: 0; overflow-wrap: break-word;
-      background: rgba(242, 239, 233, 0.03); color: var(--ink);
-      border: 1px solid var(--line); border-radius: 3px; padding: 0.6rem 0.7rem;
-      font-family: var(--sans); transition: background 0.25s ease, border-color 0.25s ease;
+    @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+    .grow { flex: 1; } /* preview shows through this gap */
+
+    #flower-name {
+      font-family: var(--serif); font-style: italic; font-size: 1.55rem; letter-spacing: 0.02em;
+      min-height: 1.9rem; margin: 0 0 0.2rem; text-shadow: var(--shadow);
+      transition: opacity 0.3s ease;
     }
-    .flower-choice .fc-name {
-      display: block; font-family: var(--serif); font-style: italic; font-size: 0.98rem; margin-bottom: 0.2rem;
+    #flower-tag {
+      font-size: 0.7rem; font-weight: 300; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--muted); min-height: 1rem; margin: 0 0 1.1rem; transition: opacity 0.3s ease;
     }
-    .flower-choice .fc-story { display: block; font-size: 0.66rem; font-weight: 300; line-height: 1.35; color: var(--muted); }
-    .flower-choice.selected { background: rgba(242, 239, 233, 0.12); border-color: var(--ink); }
-    #permission-request {
+    #flower-dots { display: flex; gap: 0.75rem; margin: 0 0 1.6rem; }
+    .dot {
+      width: 9px; height: 9px; border-radius: 50%; padding: 0;
+      border: 1px solid var(--line); background: transparent;
+      transition: background 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
+    }
+    .dot.selected { background: var(--ink); border-color: var(--ink); transform: scale(1.25); }
+
+    #begin {
       background: transparent; color: var(--ink); border: 1px solid var(--line);
-      padding: 0.8em 2.4em; border-radius: 2px; font-family: var(--sans);
+      padding: 0.8em 2.6em; border-radius: 2px; font-family: var(--sans);
       font-size: 0.9rem; letter-spacing: 0.24em; text-transform: lowercase;
-      transition: background 0.3s ease, border-color 0.3s ease;
+      transition: background 0.3s ease, border-color 0.3s ease, opacity 0.3s ease;
     }
-    #permission-request:hover { background: rgba(242, 239, 233, 0.08); border-color: var(--ink); }
-    #permission-request:disabled { opacity: 0.4; }
+    #begin:hover { background: rgba(242, 239, 233, 0.08); border-color: var(--ink); }
+    #landing-fine { font-size: 0.7rem; font-weight: 300; letter-spacing: 0.05em; color: var(--muted); margin: 1.2rem 0 0; }
+
+    /* Elegant loader (shown while the camera and models load). */
+    #loader { display: none; flex-direction: column; align-items: center; gap: 0.9rem; }
+    #loader.active { display: flex; }
+    #loader.active ~ #begin, #begin.hidden { display: none; }
+    #loader svg { width: 34px; height: 34px; animation: spin 1.1s linear infinite; }
+    #loader .lo-track { fill: none; stroke: rgba(242, 239, 233, 0.16); stroke-width: 2; }
+    #loader .lo-arc { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; stroke-dasharray: 26 100; }
+    #loader span { font-size: 0.72rem; font-weight: 300; letter-spacing: 0.2em; text-transform: lowercase; color: var(--muted); animation: pulse 1.6s ease-in-out infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
   </style>
 </head>
 <body>
-  <div id="app">
+  <div id="app" class="mode-landing">
     <video id="camera-feed" autoplay playsinline muted></video>
     <canvas id="scene"></canvas>
     <div id="vignette"></div>
     <canvas id="debug-overlay"></canvas>
     <div id="prompt"></div>
+
+    <div id="context">
+      <div id="ctx-name"></div>
+      <div id="ctx-story"></div>
+    </div>
 
     <svg id="capture-ring" viewBox="0 0 110 110" aria-hidden="true">
       <circle class="track" cx="55" cy="55" r="50" />
@@ -165,21 +195,25 @@
       <circle class="prog" cx="48" cy="48" r="44" transform="rotate(-90 48 48)" />
     </svg>
 
+    <button id="back" aria-label="back to selection">back</button>
+
     <section id="stage-capture">
       <button id="camera-toggle" aria-label="toggle camera">flip</button>
-      <button id="shutter-fallback" aria-label="capture flower"></button>
+      <button id="shutter-fallback" aria-label="capture now"></button>
     </section>
 
-    <div id="permission-gate">
-      <div id="gate-inner">
-        <h1 id="gate-title">vanitas</h1>
-        <p id="gate-lead">your reflection blooms as a flower already lost, extinct, endangered, or gone by dawn, and lives only as long as you hold yourself</p>
-        <p id="gate-choose">choose the flower you become</p>
-        <div id="flower-choices"></div>
-        <div class="rule"></div>
-        <p id="gate-fine">nothing is stored. nothing leaves this device.</p>
-        <button id="permission-request">begin</button>
+    <div id="landing">
+      <h1 id="landing-title">vanitas</h1>
+      <div class="grow"></div>
+      <div id="flower-name"></div>
+      <div id="flower-tag"></div>
+      <div id="flower-dots"></div>
+      <button id="begin">begin</button>
+      <div id="loader" aria-hidden="true">
+        <svg viewBox="0 0 40 40"><circle class="lo-track" cx="20" cy="20" r="16" /><circle class="lo-arc" cx="20" cy="20" r="16" /></svg>
+        <span>summoning</span>
       </div>
+      <p id="landing-fine">nothing is stored. nothing leaves this device.</p>
     </div>
   </div>
 
