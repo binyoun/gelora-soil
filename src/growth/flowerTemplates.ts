@@ -13,6 +13,7 @@ export interface PetalShape {
   waveAmp: number; // edge ruffle amplitude (frilliness)
   waveFreq: number; // edge ruffle frequency
   strap: number; // 0 = petal taper, 1 = long narrow strap (kadupul/tendrils)
+  bend?: number; // sideways curl along the length (ghost-orchid tendrils)
 }
 
 export interface LayerSpec {

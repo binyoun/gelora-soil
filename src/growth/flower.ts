@@ -160,12 +160,15 @@ export class Flower {
   private buildGhostOrchid(template: FlowerTemplate, rand: () => number): void {
     const b = template.petal;
     const parts: Array<{ shape: PetalShape; angleDeg: number; rotZDeg: number; pos: [number, number, number]; scale: number }> = [
-      { shape: { ...b, width: 0.14, sharp: 1.7 }, angleDeg: 90, rotZDeg: 0, pos: [0, 0.0, 0.03], scale: 0.8 }, // dorsal sepal (up)
-      { shape: { ...b, width: 0.12, sharp: 1.8, strap: 0.2 }, angleDeg: 145, rotZDeg: 52, pos: [0, 0.02, 0.02], scale: 0.9 }, // lateral (up-left)
-      { shape: { ...b, width: 0.12, sharp: 1.8, strap: 0.2 }, angleDeg: 35, rotZDeg: -52, pos: [0, 0.02, 0.02], scale: 0.9 }, // lateral (up-right)
-      { shape: { ...b, width: 0.5, sharp: 0.8, cup: 0.5, waveAmp: 0.07, waveFreq: 7 }, angleDeg: 270, rotZDeg: 180, pos: [0, -0.02, 0.05], scale: 1.0 }, // lip (down)
-      { shape: { ...b, width: 0.05, sharp: 1.0, strap: 0.78, curl: 0.05 }, angleDeg: 248, rotZDeg: 180 - 30, pos: [0, -0.12, 0.0], scale: 1.7 }, // tendril (leg)
-      { shape: { ...b, width: 0.05, sharp: 1.0, strap: 0.78, curl: 0.05 }, angleDeg: 292, rotZDeg: 180 + 30, pos: [0, -0.12, 0.0], scale: 1.7 }, // tendril (leg)
+      // slender upper sepals, gently curved outward
+      { shape: { ...b, width: 0.075, sharp: 2.0, curl: 0.12 }, angleDeg: 90, rotZDeg: 0, pos: [0, 0.0, 0.04], scale: 0.9 }, // dorsal (up)
+      { shape: { ...b, width: 0.07, sharp: 2.1, strap: 0.15, bend: 0.28 }, angleDeg: 150, rotZDeg: 60, pos: [0, 0.03, 0.03], scale: 1.0 }, // lateral (up-left)
+      { shape: { ...b, width: 0.07, sharp: 2.1, strap: 0.15, bend: -0.28 }, angleDeg: 30, rotZDeg: -60, pos: [0, 0.03, 0.03], scale: 1.0 }, // lateral (up-right)
+      // the lip (labellum): broad, cupped, softly waved
+      { shape: { ...b, width: 0.4, sharp: 0.95, cup: 0.52, waveAmp: 0.06, waveFreq: 6, curl: 0.12 }, angleDeg: 270, rotZDeg: 180, pos: [0, -0.03, 0.05], scale: 1.05 }, // lip (down)
+      // the two long curling tails ("frog legs"), the signature of the ghost orchid
+      { shape: { ...b, width: 0.032, sharp: 1.0, strap: 0.85, curl: 0.04, bend: -0.55 }, angleDeg: 250, rotZDeg: 180 - 20, pos: [-0.02, -0.14, 0.0], scale: 1.85 }, // tail (left)
+      { shape: { ...b, width: 0.032, sharp: 1.0, strap: 0.85, curl: 0.04, bend: 0.55 }, angleDeg: 290, rotZDeg: 180 + 20, pos: [0.02, -0.14, 0.0], scale: 1.85 }, // tail (right)
     ];
     for (const part of parts) {
       const wedge = 60 * DEG;
@@ -374,10 +377,11 @@ function buildPetalGeometry(
   rMax: number,
   rand: () => number,
 ): THREE.BufferGeometry {
-  const SU = 14;
+  const SU = 18;
   const SV = 8;
   const wavePhase = rand() * Math.PI * 2;
   const twist = (rand() - 0.5) * 0.14;
+  const bend = shape.bend ?? 0;
   const positions: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
@@ -389,10 +393,11 @@ function buildPetalGeometry(
     const profile = taper * (1 - shape.strap) + strapW * shape.strap;
     const wave = 1 + shape.waveAmp * Math.sin(u * shape.waveFreq + wavePhase);
     const width = profile * wave;
+    const spine = twist * u + bend * u * u; // sideways curl of the whole petal along its length
     for (let j = 0; j <= SV; j++) {
       const v = j / SV;
       const vv = v * 2 - 1;
-      const x = vv * shape.width * width + twist * u;
+      const x = vv * shape.width * width + spine;
       const y = u;
       const curlTip = shape.curl * u * u;
       const cup = shape.cup * vv * vv * width;
