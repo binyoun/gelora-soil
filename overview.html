@@ -1,0 +1,423 @@
+<title>vanitas: exhibition directions</title>
+<style>
+  :root {
+    /* light: warm exhibition-catalogue paper */
+    --ground: #ece7dd;
+    --panel: #f5f1e9;
+    --panel-2: #efe9de;
+    --ink: #221d17;
+    --muted: #5f574c;
+    --faint: #8a8073;
+    --line: rgba(34, 29, 23, 0.14);
+    --accent: #1c6b90;
+    --accent-ink: #14506d;
+    --accent-soft: rgba(28, 107, 144, 0.10);
+    --ember: #9c5a2c;
+    --glow: rgba(28, 107, 144, 0.28);
+    --hero-fade: rgba(236, 231, 221, 0);
+    --hero-fade-solid: #ece7dd;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #0a0806;
+      --panel: #15100a;
+      --panel-2: #1c150d;
+      --ink: #f2efe9;
+      --muted: rgba(242, 239, 233, 0.62);
+      --faint: rgba(242, 239, 233, 0.4);
+      --line: rgba(242, 239, 233, 0.13);
+      --accent: #8fd4f0;
+      --accent-ink: #b8e6fb;
+      --accent-soft: rgba(143, 212, 240, 0.09);
+      --ember: #d09765;
+      --glow: rgba(143, 212, 240, 0.5);
+      --hero-fade: rgba(10, 8, 6, 0);
+      --hero-fade-solid: #0a0806;
+    }
+  }
+  :root[data-theme="light"] {
+    --ground: #ece7dd; --panel: #f5f1e9; --panel-2: #efe9de;
+    --ink: #221d17; --muted: #5f574c; --faint: #8a8073;
+    --line: rgba(34, 29, 23, 0.14);
+    --accent: #1c6b90; --accent-ink: #14506d; --accent-soft: rgba(28, 107, 144, 0.10);
+    --ember: #9c5a2c; --glow: rgba(28, 107, 144, 0.28);
+    --hero-fade: rgba(236, 231, 221, 0); --hero-fade-solid: #ece7dd;
+  }
+  :root[data-theme="dark"] {
+    --ground: #0a0806; --panel: #15100a; --panel-2: #1c150d;
+    --ink: #f2efe9; --muted: rgba(242, 239, 233, 0.62); --faint: rgba(242, 239, 233, 0.4);
+    --line: rgba(242, 239, 233, 0.13);
+    --accent: #8fd4f0; --accent-ink: #b8e6fb; --accent-soft: rgba(143, 212, 240, 0.09);
+    --ember: #d09765; --glow: rgba(143, 212, 240, 0.5);
+    --hero-fade: rgba(10, 8, 6, 0); --hero-fade-solid: #0a0806;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: radial-gradient(ellipse at 50% -10%, var(--panel-2) 0%, var(--ground) 62%);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .serif { font-family: Georgia, 'Times New Roman', serif; }
+  .mono { font-family: ui-monospace, 'SF Mono', 'SFMono-Regular', Menlo, Consolas, monospace; }
+
+  .wrap { max-width: 68rem; margin: 0 auto; padding: 0 1.5rem; }
+
+  .eyebrow {
+    font-size: 0.7rem; font-weight: 500; letter-spacing: 0.24em; text-transform: uppercase;
+    color: var(--accent-ink);
+  }
+  .label {
+    font-size: 0.68rem; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  /* HERO */
+  .hero { position: relative; padding: clamp(3.5rem, 9vw, 6.5rem) 0 2.5rem; overflow: hidden; }
+  .hero-inner { position: relative; z-index: 2; }
+  .hero h1 {
+    font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-weight: 400;
+    font-size: clamp(3rem, 11vw, 6rem); line-height: 0.98; margin: 0.6rem 0 0;
+    letter-spacing: 0.01em; text-wrap: balance;
+  }
+  .hero .thesis {
+    font-family: Georgia, 'Times New Roman', serif; font-style: italic;
+    font-size: clamp(1.05rem, 2.4vw, 1.4rem); color: var(--muted);
+    max-width: 34rem; margin: 1.1rem 0 0; line-height: 1.5; text-wrap: balance;
+  }
+  #pulse-canvas {
+    position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 190px;
+    z-index: 1; opacity: 0.9;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+            mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  }
+  .hero-meta { display: flex; flex-wrap: wrap; gap: 1.4rem 2.2rem; margin-top: 2rem; align-items: baseline; }
+  .hero-meta .k { color: var(--faint); }
+  .hero-meta a { color: var(--accent-ink); text-decoration: none; border-bottom: 1px solid var(--line); padding-bottom: 1px; }
+  .hero-meta a:hover { border-color: var(--accent); }
+
+  /* SECTION */
+  section { padding: clamp(2.2rem, 5vw, 3.6rem) 0; border-top: 1px solid var(--line); }
+  .sec-head { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1.6rem; flex-wrap: wrap; }
+  .sec-head h2 {
+    font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-weight: 400;
+    font-size: clamp(1.5rem, 3.6vw, 2.2rem); margin: 0; text-wrap: balance;
+  }
+  p { max-width: 42rem; }
+  p.lead { font-size: 1.08rem; color: var(--ink); }
+  .muted { color: var(--muted); }
+
+  /* STANDS / STRENGTH + GAPS */
+  .now-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; margin-top: 1.2rem; }
+  @media (min-width: 720px) { .now-grid { grid-template-columns: 1fr 1fr; } }
+  .stat-note { border-left: 2px solid var(--accent); padding-left: 1rem; }
+  .stat-note.gap { border-color: var(--ember); }
+  .stat-note h3 { margin: 0 0 0.7rem; font-size: 0.72rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--faint); font-weight: 600; }
+  .stat-note ol { margin: 0; padding-left: 1.1rem; display: grid; gap: 0.6rem; }
+  .stat-note li { max-width: 30rem; }
+  .stat-note li b { font-weight: 600; }
+
+  /* FLOWER LEGEND */
+  .flowers { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; margin-top: 0.5rem; }
+  .flower { background: var(--panel); padding: 1.1rem 1.1rem 1.2rem; }
+  .flower .fn { font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-size: 1.15rem; }
+  .flower .ff { display: block; margin-top: 0.35rem; font-size: 0.66rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ember); }
+
+  /* DIRECTION CARDS */
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+  .card {
+    position: relative; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 6px; padding: 1.3rem 1.3rem 1.4rem; display: flex; flex-direction: column; gap: 0.85rem;
+  }
+  .card.feature { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 8px 40px -18px var(--glow); background: linear-gradient(180deg, var(--accent-soft), var(--panel) 60%); }
+  .card-top { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; }
+  .card-ref { font-family: ui-monospace, monospace; font-size: 0.72rem; color: var(--faint); letter-spacing: 0.05em; }
+  .card h3 { font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-weight: 400; font-size: 1.3rem; margin: 0.1rem 0 0; line-height: 1.15; }
+  .card .exp { font-size: 0.92rem; color: var(--ink); margin: 0; max-width: none; }
+  .card .hw { font-family: ui-monospace, monospace; font-size: 0.72rem; line-height: 1.55; color: var(--muted); background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 0.6rem 0.7rem; }
+  .card .concept { font-size: 0.82rem; color: var(--muted); font-style: italic; font-family: Georgia, serif; margin: 0; border-top: 1px solid var(--line); padding-top: 0.7rem; }
+  .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: auto; }
+  .chip { font-size: 0.63rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; padding: 0.28em 0.6em; border-radius: 20px; border: 1px solid var(--line); color: var(--muted); }
+  .chip.solo { color: var(--accent-ink); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+  .chip.flagship { color: var(--ember); border-color: color-mix(in srgb, var(--ember) 45%, transparent); }
+  .chip.rec { background: var(--accent); color: #05201c; border-color: var(--accent); }
+  :root[data-theme="light"] .chip.rec, :root:not([data-theme]) .chip.rec { color: #fff; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme]) .chip.rec { color: #05201c; } }
+
+  /* ALIGNMENT */
+  .align { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .align-row { background: var(--panel); padding: 1.2rem 1.3rem; display: grid; gap: 0.5rem 1.4rem; grid-template-columns: 1fr; }
+  @media (min-width: 680px) { .align-row { grid-template-columns: 13rem 1fr; align-items: start; } }
+  .align-row .han { font-family: Georgia, serif; font-style: italic; font-size: 1.25rem; }
+  .align-row .han small { display: block; font-family: ui-monospace, monospace; font-style: normal; font-size: 0.66rem; letter-spacing: 0.1em; color: var(--faint); text-transform: uppercase; margin-top: 0.2rem; }
+  .align-row p { margin: 0; font-size: 0.93rem; }
+
+  /* TIMELINE */
+  .arc { display: grid; gap: 1rem; grid-template-columns: 1fr; counter-reset: step; }
+  @media (min-width: 760px) { .arc { grid-template-columns: repeat(3, 1fr); } }
+  .arc-step { position: relative; padding: 1.3rem; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+  .arc-step .yr { font-family: ui-monospace, monospace; font-size: 0.72rem; letter-spacing: 0.08em; color: var(--accent-ink); }
+  .arc-step h3 { font-family: Georgia, serif; font-style: italic; font-weight: 400; font-size: 1.25rem; margin: 0.4rem 0 0.5rem; }
+  .arc-step p { margin: 0; font-size: 0.87rem; color: var(--muted); }
+  .arc-step .venue { display: inline-block; margin-top: 0.8rem; font-size: 0.66rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); }
+
+  /* SCAFFOLD READOUT */
+  .readout { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 1.2rem 1.3rem; font-family: ui-monospace, monospace; font-size: 0.8rem; line-height: 1.8; overflow-x: auto; }
+  .readout .row { white-space: nowrap; }
+  .readout .ok { color: var(--accent-ink); }
+  .readout .dim { color: var(--faint); }
+  .readout .k { color: var(--muted); }
+
+  footer { border-top: 1px solid var(--line); padding: 2.5rem 0 3.5rem; color: var(--faint); font-size: 0.82rem; }
+  footer a { color: var(--accent-ink); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+
+  @media (prefers-reduced-motion: reduce) { #pulse-canvas { opacity: 0.55; } }
+</style>
+
+<div class="hero">
+  <canvas id="pulse-canvas" aria-hidden="true"></canvas>
+  <div class="wrap hero-inner">
+    <div class="eyebrow">Gelora lineage &middot; exhibition direction 2026</div>
+    <h1>vanitas</h1>
+    <p class="thesis">A contemporary vanitas that lives only while you hold yourself, moving off the phone and into the room on the pulse of a held hand.</p>
+    <div class="hero-meta mono">
+      <span><span class="k">now</span>&nbsp;&nbsp;WebAR, front camera, on-device</span>
+      <span><span class="k">next</span>&nbsp;&nbsp;pulse-ground altar</span>
+      <span><a href="https://binyoun.github.io/gelora-soil/">live piece &rarr;</a></span>
+      <span><a href="https://github.com/binyoun/gelora-soil">repo &rarr;</a></span>
+    </div>
+  </div>
+</div>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="label">01</span><h2>The piece as it stands</h2></div>
+    <p class="lead">You choose one of four doomed flowers. A self-timer photographs you, and your portrait is mapped onto the petals of a 3D flower that grows from your open palm. Stillness grows it, closing the hand wilts it, tilting the palm pours it away, a second hand glitches it. Nothing is stored. The memento mori is written into the growth math: maturity approaches 1 and never arrives.</p>
+    <div class="now-grid">
+      <div class="stat-note">
+        <h3>What already works</h3>
+        <ol>
+          <li><b>Concept and mechanic are one thing.</b> Loss is not illustrated, it is enforced: nothing stored, the bloom exists only in the holding.</li>
+          <li><b>Sustained, not commanded.</b> Every interaction is continuous hand geometry, no trained classifiers. The participant holds, they do not press.</li>
+          <li><b>Exhibition-ready spine.</b> A renderer-agnostic growth engine, so each direction below is a new input, not a rewrite.</li>
+        </ol>
+      </div>
+      <div class="stat-note gap">
+        <h3>The gap a room should close</h3>
+        <ol>
+          <li><b>The phone is the wrong hand.</b> One hand holds it, so the second-hand mediated touch is out of reach.</li>
+          <li><b>No spectator surface.</b> From two metres it reads as a person looking at a phone; care and duration stay invisible.</li>
+          <li><b>Low stakes.</b> Tap-to-restart quietly undercuts the argument that this is loss.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="label">the four</span><h2>Flowers you wear</h2></div>
+    <div class="flowers">
+      <div class="flower"><span class="fn">semper augustus</span><span class="ff">extinct</span></div>
+      <div class="flower"><span class="fn">chrysanthemum</span><span class="ff">the dead</span></div>
+      <div class="flower"><span class="fn">kadupul</span><span class="ff">one night only</span></div>
+      <div class="flower"><span class="fn">ghost orchid</span><span class="ff">endangered</span></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="label">02</span><h2>Six sensor directions</h2></div>
+    <p class="muted">Ways to move vanitas from a phone piece into a gallery installation with physical sensors. Each names the bodily experience, the hardware, and how it deepens the vanitas concept.</p>
+    <div class="cards" style="margin-top:1.6rem">
+
+      <div class="card">
+        <div class="card-top"><span class="card-ref">a</span></div>
+        <h3>Offering table</h3>
+        <p class="exp">A waist-high dark plinth with a palm-shaped depression. You rest one open hand palm-up; above it, on holographic gauze, the flower grows from your actual hand into the room, seen by you and by everyone behind you. Both hands are free, so the mediated touch finally works.</p>
+        <div class="hw">fixed overhead camera<br>short-throw projector + gauze<br>ToF / IR presence &middot; ESP32</div>
+        <p class="concept">Offering becomes a posture; stillness becomes visible.</p>
+        <div class="chips"><span class="chip solo">solo</span><span class="chip">near-term</span></div>
+      </div>
+
+      <div class="card feature">
+        <div class="card-top"><span class="card-ref">b</span><span class="chip rec">recommended first</span></div>
+        <h3>맥 pulse ground</h3>
+        <p class="exp">A brass dome at the hand-acupuncture heart point holds a pulse sensor. The flower grows in time with your heartbeat, and the dome beats back through haptics, so holding yourself becomes literal: two pulses converging. Growth becomes heart-rate settling, not hand stillness alone.</p>
+        <div class="hw">MAX30102 pulse (PPG)<br>DRV2605 + LRA haptic<br>ESP32 &middot; Web Serial</div>
+        <p class="concept">Vanitas tied to the pulse, the signal whose stopping is the whole genre.</p>
+        <div class="chips"><span class="chip solo">solo</span><span class="chip">near-term</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-top"><span class="card-ref">c</span></div>
+        <h3>Analog memory</h3>
+        <p class="exp">The tilt-to-pour gesture becomes watering real soil. Moisture is the room's slow variable: blooms are fuller on well-tended days, thin and pale on neglected ones, reverting overnight as the earth dries. The only memory in the piece is water evaporating.</p>
+        <div class="hw">capacitive moisture probe<br>load cell + HX711<br>ESP32</div>
+        <p class="concept">Care becomes cumulative, and nothing digital is stored.</p>
+        <div class="chips"><span class="chip solo">solo</span><span class="chip">venue caveat</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-top"><span class="card-ref">d</span></div>
+        <h3>사물놀이 four hands</h3>
+        <p class="exp">Four altars in a circle, one flower per samul nori voice and element. A central bloom germinates only when several strangers' pulses fall into phase. Without speaking, they must synchronise their bodies to grow something none of them owns.</p>
+        <div class="hw">4&times; pulse stack<br>ESP-NOW mesh (no server)<br>surface transducers + projection</div>
+        <p class="concept">Vanitas made collective: can you hold each other?</p>
+        <div class="chips"><span class="chip flagship">flagship</span><span class="chip">collaborator scale</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-top"><span class="card-ref">e</span></div>
+        <h3>Sun budget</h3>
+        <p class="exp">A framing that can wrap any of the above. The whole install runs off a solar panel into a supercapacitor. The day's harvested energy is the garden's vitality: vivid and quick on bright days, slow and dim on grey ones, asleep when spent.</p>
+        <div class="hw">panel + MPPT + LiFePO4<br>INA226 current sensing<br>low-power SBC + laser projector</div>
+        <p class="concept">Extinction and energy become one economy.</p>
+        <div class="chips"><span class="chip">framing</span><span class="chip">permacomputing</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-top"><span class="card-ref">f</span></div>
+        <h3>Seed in the hand</h3>
+        <p class="exp">A kiln-fired ceramic seed held to your chest beats and warms with the flower, then cools and stills in your hand when it dies. You return it, cold, to a bowl of other cold seeds by the exit.</p>
+        <div class="hw">ESP32-C3 + LRA + PTC heater<br>inductive charging bowl</div>
+        <p class="concept">Loss becomes thermal and held; the bowl is the skull on the table.</p>
+        <div class="chips"><span class="chip solo">solo</span><span class="chip">second iteration</span></div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="label">03</span><h2>Alignment to Sensing Otherwise</h2></div>
+    <p class="muted">Why the top three are not additions but the PhD argument built in hardware.</p>
+    <div class="align" style="margin-top:1.4rem">
+      <div class="align-row">
+        <div class="han">맥<small>maek &middot; pulse</small></div>
+        <p>Hand acupuncture as legitimacy from lived practice: the sensor sits on a meridian point, and the hand is an instrument of diagnosis and care, not of command. This enacts &Oslash;ryn's pulse as the work's clock. Sensing Otherwise stated as an interface.</p>
+      </div>
+      <div class="align-row">
+        <div class="han">사물놀이<small>samul nori &middot; entrainment</small></div>
+        <p>Collective entrainment of four voices into one becomes the interaction model itself, which is the research question verbatim: Eastern cosmological models of relation generating cultural interaction models. The circle of stations is the cycle made architectural.</p>
+      </div>
+      <div class="align-row">
+        <div class="han">soil &amp; water<small>permacomputing</small></div>
+        <p>Permacomputing in the literal sense: moisture as storage medium instead of a database. Care as maintenance rather than event, aligned to the ecofeminist post-carbon framing (Haraway, staying with the trouble, done with a watering can).</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="label">04</span><h2>Venue arc</h2></div>
+    <div class="arc">
+      <div class="arc-step">
+        <div class="yr">2026</div>
+        <h3>Pulse altar</h3>
+        <p>Build a + b as one prototype. The smallest move off the phone that frees both hands, creates a spectator surface, and raises the stakes to the heartbeat. Reuses the whole codebase with one ESP32 board.</p>
+        <span class="venue">small / university gallery</span>
+      </div>
+      <div class="arc-step">
+        <div class="yr">next</div>
+        <h3>Soil memory added</h3>
+        <p>Add the analog soil-and-water ground for the first museum show. Durational, low-maintenance, and it reads without wall text.</p>
+        <span class="venue">museum</span>
+      </div>
+      <div class="arc-step">
+        <div class="yr">PhD era</div>
+        <h3>Four hands</h3>
+        <p>The synchronised circle as the flagship, built during the PhD. The renderer-agnostic engine makes it a synchronisation problem, not a rewrite.</p>
+        <span class="venue">ISEA / Ars Electronica scale</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="label">05</span><h2>Software scaffold, already in the repo</h2></div>
+    <p class="muted">Branch <span class="mono">pulse-altar</span>. The input path is stubbed so the piece runs identically with or without the board.</p>
+    <div class="readout" style="margin-top:1.2rem">
+      <div class="row"><span class="k">src/sensors/pulse.ts</span>&nbsp;&nbsp;Web Serial pulse in &middot; <span class="dim">simulated fallback</span></div>
+      <div class="row"><span class="k">engine.ts</span>&nbsp;&nbsp;tick(hand, dt, <span class="ok">cardiac?</span>) &middot; care = stillness &amp; settled pulse</div>
+      <div class="row"><span class="k">?altar=1</span>&nbsp;&nbsp;fixed-camera mode &middot; connect-pulse chip &middot; bpm readout</div>
+      <div class="row"><span class="dim">null cardiac -&gt; behaves exactly as the camera-only version</span></div>
+      <div class="row">&nbsp;</div>
+      <div class="row"><span class="ok">&check;</span> typecheck clean&nbsp;&nbsp;<span class="ok">&check;</span> build clean&nbsp;&nbsp;<span class="ok">&check;</span> headless boot, altar chrome loads</div>
+      <div class="row"><span class="dim">not on hardware yet &middot; branch not merged</span></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    vanitas (repo <a href="https://github.com/binyoun/gelora-soil">gelora-soil</a>), part of the Gelora practice lineage. Exhibition directions from a review pass, 2026. Nothing is stored, nothing leaves the device.
+  </div>
+</footer>
+
+<script>
+  (function () {
+    var canvas = document.getElementById('pulse-canvas');
+    if (!canvas) return;
+    var ctx = canvas.getContext('2d');
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var W = 0, H = 0;
+    function accent() {
+      return getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#8fd4f0';
+    }
+    function resize() {
+      W = canvas.clientWidth; H = canvas.clientHeight;
+      canvas.width = W * dpr; canvas.height = H * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    // One period of an ECG-like trace, as a function of x within [0,1).
+    function beat(t) {
+      // t in [0,1): mostly flat baseline with a sharp QRS spike near 0.5
+      var d = t - 0.5;
+      var qrs = Math.exp(-Math.pow(d * 34, 2)) * 1.0        // tall spike
+              - Math.exp(-Math.pow((d + 0.028) * 60, 2)) * 0.28 // small dip before
+              - Math.exp(-Math.pow((d - 0.03) * 55, 2)) * 0.42; // dip after
+      var pWave = Math.exp(-Math.pow((d + 0.16) * 26, 2)) * 0.14;
+      var tWave = Math.exp(-Math.pow((d - 0.2) * 16, 2)) * 0.2;
+      return pWave + qrs + tWave;
+    }
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var offset = 0;
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+      var col = accent();
+      var mid = H * 0.62;
+      var amp = H * 0.34;
+      var period = 260; // px per heartbeat
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      ctx.strokeStyle = col; ctx.lineWidth = 1.6;
+      ctx.shadowColor = col; ctx.shadowBlur = 14;
+      ctx.globalAlpha = 0.95;
+      ctx.beginPath();
+      for (var x = 0; x <= W; x += 2) {
+        var phase = ((x + offset) % period) / period;
+        var y = mid - beat(phase) * amp;
+        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    }
+    function loop() { offset += 1.1; draw(); if (!reduce) requestAnimationFrame(loop); }
+    window.addEventListener('resize', function () { resize(); if (reduce) draw(); });
+    resize();
+    if (reduce) { draw(); } else { loop(); }
+    // Redraw on theme toggle so the accent stays correct.
+    new MutationObserver(function () { if (reduce) draw(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  })();
+</script>

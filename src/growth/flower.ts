@@ -43,6 +43,7 @@ export class Flower {
   private centerScaleFactor: number;
   private swayAmp: number;
   private breatheAmp: number;
+  private baseEmissive: number;
 
   private particlePos: Float32Array;
   private particleVelocities: Float32Array;
@@ -65,6 +66,7 @@ export class Flower {
     this.centerScaleFactor = template.centerScale;
     this.swayAmp = template.swayAmp ?? 0.06;
     this.breatheAmp = template.breatheAmp ?? 0;
+    this.baseEmissive = template.emissiveIntensity;
 
     this.mat = new THREE.MeshStandardMaterial({
       map: photo,
@@ -261,6 +263,7 @@ export class Flower {
     present: boolean,
     time: number,
     dt: number,
+    cardiacPhase: number | null = null,
   ): void {
     const lastTouchAge = growth.mutations.length ? growth.age - growth.mutations[growth.mutations.length - 1]!.at : 999;
     const touchSurge = Math.max(0, 1 - lastTouchAge / 1.6);
@@ -295,6 +298,19 @@ export class Flower {
       Math.sin(time * 0.6) * (0.03 + nod * 0.4),
     );
     const breathe = this.breatheAmp * Math.sin(time * 0.55); // whole-bloom open/close
+
+    // Pulse-ground altar (Øryn 맥): the whole bloom throbs on each systole. A
+    // sharp swell at the start of the beat (phase 0) decaying across the beat,
+    // plus a matching emissive lift for the luminous flowers. Only when a pulse
+    // is present, so non-altar behaviour is untouched.
+    if (cardiacPhase !== null) {
+      const systole = Math.exp(-cardiacPhase * 5.0); // 1 at the beat, fading over it
+      this.group.scale.setScalar(1 + systole * 0.05 * unfold);
+      this.mat.emissiveIntensity = this.baseEmissive + systole * 0.28 * unfold;
+    } else {
+      this.group.scale.setScalar(1);
+      this.mat.emissiveIntensity = this.baseEmissive;
+    }
 
     if (this.stem) {
       this.stem.scale.set(handScale, lift, handScale);

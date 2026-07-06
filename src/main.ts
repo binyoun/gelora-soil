@@ -7,6 +7,7 @@ import { initHandLandmarker, detectHands } from './hand/landmarker';
 import { PalmStabilityTracker, type RawLandmark } from './hand/palm';
 import { GrowthEngine } from './growth/engine';
 import { PulseSensor } from './sensors/pulse';
+import { AltarSound } from './sound/altarSound';
 import { Flower } from './growth/flower';
 import { TEMPLATES, type FlowerTemplate } from './growth/flowerTemplates';
 import { Roots } from './growth/roots';
@@ -68,6 +69,8 @@ const AUTO_CAPTURE_SECONDS = 3; // selfie self-timer
 // it is not mirrored. Without a board the simulated pulse keeps it running.
 const ALTAR_MODE = new URLSearchParams(window.location.search).get('altar') === '1';
 const pulse = new PulseSensor();
+const altarSound = new AltarSound();
+altarSound.setEnabled(ALTAR_MODE);
 
 const camera = new Camera(videoEl);
 const arScene = new ARScene(sceneCanvas);
@@ -111,6 +114,8 @@ let placeholderTex: THREE.CanvasTexture | null = null;
 async function begin(): Promise<void> {
   if (starting || mode !== 'landing') return;
   starting = true;
+  // This tap is the user gesture Web Audio needs; start the altar sound here.
+  if (ALTAR_MODE) altarSound.resume().catch((err) => console.error(err));
   if (!cameraReady) {
     landingEl.classList.add('loading');
     try {
@@ -474,7 +479,8 @@ function loop(nowMs: number): void {
 
     const t = nowMs / 1000;
     roots?.update(primaryRaw, ctx, maturity);
-    if (currentDna) flower?.update(currentDna, state, originWorld, handScale, hand.present, t, dtSeconds);
+    if (currentDna) flower?.update(currentDna, state, originWorld, handScale, hand.present, t, dtSeconds, cardiacIn ? cardiac.phase : null);
+    altarSound.update(state, cardiacIn, hand.present, dtSeconds);
   }
 
   if (revealStartMs !== null) {

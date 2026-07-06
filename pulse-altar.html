@@ -1,0 +1,286 @@
+<title>vanitas: the pulse altar and the seed</title>
+<style>
+  :root {
+    --ground: #ece7dd; --panel: #f5f1e9; --panel-2: #efe9de;
+    --ink: #221d17; --muted: #5f574c; --faint: #8a8073;
+    --line: rgba(34, 29, 23, 0.14);
+    --accent: #1c6b90; --accent-ink: #14506d; --accent-soft: rgba(28, 107, 144, 0.10);
+    --ember: #9c5a2c; --glow: rgba(28, 107, 144, 0.28);
+    --good: #3f7d54;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #0a0806; --panel: #15100a; --panel-2: #1c150d;
+      --ink: #f2efe9; --muted: rgba(242, 239, 233, 0.62); --faint: rgba(242, 239, 233, 0.4);
+      --line: rgba(242, 239, 233, 0.13);
+      --accent: #8fd4f0; --accent-ink: #b8e6fb; --accent-soft: rgba(143, 212, 240, 0.09);
+      --ember: #d09765; --glow: rgba(143, 212, 240, 0.5); --good: #7fc79a;
+    }
+  }
+  :root[data-theme="light"] {
+    --ground: #ece7dd; --panel: #f5f1e9; --panel-2: #efe9de;
+    --ink: #221d17; --muted: #5f574c; --faint: #8a8073; --line: rgba(34, 29, 23, 0.14);
+    --accent: #1c6b90; --accent-ink: #14506d; --accent-soft: rgba(28, 107, 144, 0.10);
+    --ember: #9c5a2c; --glow: rgba(28, 107, 144, 0.28); --good: #3f7d54;
+  }
+  :root[data-theme="dark"] {
+    --ground: #0a0806; --panel: #15100a; --panel-2: #1c150d;
+    --ink: #f2efe9; --muted: rgba(242, 239, 233, 0.62); --faint: rgba(242, 239, 233, 0.4);
+    --line: rgba(242, 239, 233, 0.13);
+    --accent: #8fd4f0; --accent-ink: #b8e6fb; --accent-soft: rgba(143, 212, 240, 0.09);
+    --ember: #d09765; --glow: rgba(143, 212, 240, 0.5); --good: #7fc79a;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: radial-gradient(ellipse at 50% -10%, var(--panel-2) 0%, var(--ground) 62%);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    line-height: 1.6; -webkit-font-smoothing: antialiased;
+  }
+  .serif { font-family: Georgia, 'Times New Roman', serif; }
+  .wrap { max-width: 68rem; margin: 0 auto; padding: 0 1.5rem; }
+  .eyebrow { font-size: 0.7rem; font-weight: 500; letter-spacing: 0.24em; text-transform: uppercase; color: var(--accent-ink); }
+  .label { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--faint); }
+
+  .hero { position: relative; padding: clamp(3.5rem, 9vw, 6rem) 0 2.5rem; overflow: hidden; }
+  .hero-inner { position: relative; z-index: 2; }
+  .hero .maek { font-family: Georgia, serif; font-style: italic; font-size: clamp(2.6rem, 9vw, 5rem); line-height: 1; margin: 0.4rem 0 0; }
+  .hero .maek small { font-family: ui-monospace, monospace; font-style: normal; font-size: 0.9rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--faint); display: inline-block; margin-left: 0.9rem; vertical-align: middle; }
+  .hero h1 { font-family: Georgia, serif; font-style: italic; font-weight: 400; font-size: clamp(1.4rem, 3.6vw, 2.1rem); margin: 0.6rem 0 0; color: var(--muted); text-wrap: balance; max-width: 30rem; }
+  #pulse-canvas {
+    position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 200px; z-index: 1; opacity: 0.9;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+            mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  }
+  .hero-meta { display: flex; flex-wrap: wrap; gap: 1.2rem 2rem; margin-top: 1.8rem; font-family: ui-monospace, monospace; font-size: 0.82rem; }
+  .hero-meta .k { color: var(--faint); }
+  .hero-meta a { color: var(--accent-ink); text-decoration: none; border-bottom: 1px solid var(--line); }
+  .hero-meta a:hover { border-color: var(--accent); }
+
+  section { padding: clamp(2.2rem, 5vw, 3.4rem) 0; border-top: 1px solid var(--line); }
+  .sec-head { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+  .sec-head h2 { font-family: Georgia, serif; font-style: italic; font-weight: 400; font-size: clamp(1.5rem, 3.6vw, 2.1rem); margin: 0; text-wrap: balance; }
+  p { max-width: 42rem; }
+  p.lead { font-size: 1.08rem; }
+  .muted { color: var(--muted); }
+
+  /* TRIPTYCH */
+  .triptych { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  @media (min-width: 720px) { .triptych { grid-template-columns: repeat(3, 1fr); } }
+  .part { background: var(--panel); padding: 1.4rem 1.3rem 1.5rem; }
+  .part .pk { font-family: ui-monospace, monospace; font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent-ink); }
+  .part h3 { font-family: Georgia, serif; font-style: italic; font-weight: 400; font-size: 1.4rem; margin: 0.4rem 0 0.6rem; }
+  .part p { font-size: 0.9rem; color: var(--muted); margin: 0; }
+
+  /* ARC (true sequence) */
+  .arc { display: grid; gap: 0.75rem; counter-reset: step; }
+  .arc-step { display: grid; grid-template-columns: 2.4rem 1fr; gap: 0.4rem 1rem; align-items: start; padding: 1rem 1.1rem; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+  .arc-step::before { counter-increment: step; content: counter(step); font-family: ui-monospace, monospace; font-size: 0.9rem; color: var(--accent-ink); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: 50%; width: 2rem; height: 2rem; display: grid; place-items: center; grid-row: span 2; }
+  .arc-step h4 { font-family: Georgia, serif; font-style: italic; font-weight: 400; font-size: 1.12rem; margin: 0.2rem 0 0; }
+  .arc-step p { grid-column: 2; margin: 0; font-size: 0.9rem; color: var(--muted); }
+
+  /* TWO-COL */
+  .cols { display: grid; gap: 1.4rem; }
+  @media (min-width: 760px) { .cols { grid-template-columns: 1fr 1fr; } }
+  .box { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 1.3rem; }
+  .box h3 { font-family: Georgia, serif; font-style: italic; font-weight: 400; font-size: 1.25rem; margin: 0 0 0.8rem; }
+  .layer { border-left: 2px solid var(--accent); padding: 0.15rem 0 0.15rem 0.9rem; margin-bottom: 1rem; }
+  .layer:last-child { margin-bottom: 0; }
+  .layer b { font-weight: 600; }
+  .layer span { display: block; color: var(--muted); font-size: 0.88rem; }
+  .map { font-family: ui-monospace, monospace; font-size: 0.74rem; color: var(--accent-ink); margin-top: 0.3rem; }
+
+  .hw { font-family: ui-monospace, monospace; font-size: 0.75rem; line-height: 1.7; color: var(--muted); }
+  .hard li { color: var(--muted); font-size: 0.9rem; margin-bottom: 0.5rem; max-width: 34rem; }
+  .hard li b { color: var(--ink); font-weight: 600; }
+
+  /* BUILD ORDER */
+  .steps { display: grid; gap: 0.6rem; }
+  .step { display: flex; align-items: center; gap: 0.9rem; padding: 0.85rem 1.1rem; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+  .step .st { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.28em 0.6em; border-radius: 20px; white-space: nowrap; }
+  .step .st.done { color: var(--good); border: 1px solid color-mix(in srgb, var(--good) 45%, transparent); }
+  .step .st.next { background: var(--accent); color: #05201c; }
+  .step .st.later { color: var(--faint); border: 1px solid var(--line); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme]) .step .st.next { color: #05201c; } }
+  .step .sl { flex: 1; min-width: 0; }
+  .step .sl b { font-weight: 600; }
+  .step .sl span { display: block; color: var(--muted); font-size: 0.82rem; }
+  .step code { font-family: ui-monospace, monospace; font-size: 0.78rem; color: var(--accent-ink); }
+
+  footer { border-top: 1px solid var(--line); padding: 2.4rem 0 3.4rem; color: var(--faint); font-size: 0.82rem; }
+  footer a { color: var(--accent-ink); text-decoration: none; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  @media (prefers-reduced-motion: reduce) { #pulse-canvas { opacity: 0.55; } }
+</style>
+
+<div class="hero">
+  <canvas id="pulse-canvas" aria-hidden="true"></canvas>
+  <div class="wrap hero-inner">
+    <div class="eyebrow">vanitas &middot; direction b + f, developed</div>
+    <div class="maek serif">맥<small>maek / pulse</small></div>
+    <h1>The pulse altar and the seed: one work in three parts, grown on a held heartbeat.</h1>
+    <div class="hero-meta">
+      <span><span class="k">grows on</span> heart-rate settling</span>
+      <span><span class="k">breathes on</span> each systole</span>
+      <span><span class="k">dies when</span> you let go</span>
+    </div>
+  </div>
+</div>
+
+<section>
+  <div class="wrap">
+    <p class="lead">You are read by your own hand: the palm as a full body map, a pulse sensor at the heart point. Your portrait grows as a doomed flower on your heartbeat. You hold its warm, beating life as a porcelain seed against your chest, feel it cool and stop when the flower dies, and leave the cold seed in a bowl that fills, across the exhibition, with everyone's finished bloom. The flower's life is bound to the pulse, the one signal whose stopping the whole genre of vanitas mourns.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="label">the whole</span><h2>Three parts, one system</h2></div>
+    <div class="triptych">
+      <div class="part">
+        <div class="pk">b &middot; the site</div>
+        <h3>The altar</h3>
+        <p>A low blackened plinth with a cast palm rest. A brass or 백자 porcelain dome at the heart point holds the pulse sensor. Above, on holographic gauze, your flower grows from your actual hand into the room, seen by everyone behind you.</p>
+      </div>
+      <div class="part">
+        <div class="pk">f &middot; the held body</div>
+        <h3>The seed</h3>
+        <p>A palm-sized kiln-fired porcelain seed you cup at the altar. It finds your pulse, warms, and beats the flower's rhythm against your chest. When the bloom dies it cools and stills in your hand.</p>
+      </div>
+      <div class="part">
+        <div class="pk">the memento mori</div>
+        <h3>The bowl</h3>
+        <p>You set the cold seed among the others by the exit. The bowl fills through the show with every visitor's cooled bloom: the skull on the table, made collective and physical.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="label">the encounter</span><h2>What happens, in order</h2></div>
+    <div class="arc">
+      <div class="arc-step"><h4>Approach and offer a hand</h4><p>You rest one open hand palm-up in the altar's depression, or take a cool seed from the bowl and cup it. The gesture is offering a pulse to be read, not pressing a button.</p></div>
+      <div class="arc-step"><h4>The pulse is found</h4><p>The sensor catches your heartbeat. Stillness and a settled, slow heart let the flower take root faster: care, made measurable.</p></div>
+      <div class="arc-step"><h4>Your portrait blooms</h4><p>The flower grows above your hand wearing your own face on its petals, breathing outward on every systole, glowing a little brighter on the beat.</p></div>
+      <div class="arc-step"><h4>You hold it to your chest</h4><p>The seed is warm and beating the flower's rhythm. As the bloom matures the rhythm drifts from yours: it becomes a separate life that is still you.</p></div>
+      <div class="arc-step"><h4>It is let go</h4><p>Lift the hand, or its life runs out, and the flower dies: not on a timer but because the tie to the living body broke. The seed's beat slows, stops, and it cools in your hand.</p></div>
+      <div class="arc-step"><h4>You leave it in the bowl</h4><p>You set the cold seed down among the others. Nothing is stored. The only trace is a cooled stone in a growing pile.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="label">the sound</span><h2>The auscultation</h2></div>
+    <p class="muted">Sound concept A: near-silence in three layers, all synthesised and driven by the flower's state. Vanitas as the return to silence. Prototyped now, running in the browser.</p>
+    <div class="cols" style="margin-top:1.4rem">
+      <div class="box">
+        <h3>Three layers</h3>
+        <div class="layer"><b>The felt thump</b><span>A low kick under each heartbeat, felt through a transducer in the plinth more than heard.</span><div class="map">on beat &rarr; low sine, calm sets weight</div></div>
+        <div class="layer"><b>The celadon bell</b><span>A single struck partial on the beat once the flower has taken, brighter and denser as it matures.</span><div class="map">maturity &rarr; note window + overtones</div></div>
+        <div class="layer"><b>The drone</b><span>A sustained bed that fades in with maturity, detunes sour as the flower wilts, and falls to silence when you let go.</span><div class="map">wilt &rarr; detune + darken &middot; released &rarr; silence</div></div>
+      </div>
+      <div class="box">
+        <h3>Yours, or a collaborator's</h3>
+        <p class="muted" style="font-size:0.92rem">Layer A is parameter-mapped generative sound, your own medium, kept intimate and restrained. A collaborator earns their place later, and specifically:</p>
+        <ul class="hard" style="margin:0.8rem 0 0; padding-left:1.1rem">
+          <li><b>맥 as 장단.</b> A percussionist or composer who knows Korean rhythmic cycles makes the pulse musically true, with 장구 as the single voice, threading toward the four-hands flagship where four instruments become four visitors.</li>
+          <li><b>Spatial sound.</b> Multichannel or Ambisonic so the bloom is heard growing in the room, for ISEA or Ars Electronica scale.</li>
+          <li><b>The bowl drone.</b> A collective near-silent swell as each cold seed joins the pile.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="label">the seed</span><h2>The object, and the honest hard parts</h2></div>
+    <div class="cols">
+      <div class="box">
+        <h3>Inside the porcelain</h3>
+        <p class="hw">kiln-fired 백자 shell (bone / relic)<br>ESP32-C3 &middot; BLE<br>LRA + DRV2605 &middot; haptic beat<br>PTC heater + thermistor &middot; 34-38C<br>MAX30102 or contact pulse<br>Qi inductive charging (no port)</p>
+        <p class="muted" style="font-size:0.88rem; margin-top:1rem">A two-part seed: the shell is fired first, a potted electronics core is sealed in after. Sealed and wipeable, it charges in the bowl between visitors.</p>
+      </div>
+      <div class="box">
+        <h3>What is genuinely hard</h3>
+        <ul class="hard" style="margin:0; padding-left:1.1rem">
+          <li><b>Power and heat.</b> A heater on a palm-sized cell sets the bloom length; the answer is gentle warmth, short blooms, fast inductive top-up.</li>
+          <li><b>Hygiene.</b> Sealed porcelain, wiped between hands, enough seeds in rotation.</li>
+          <li><b>Fabrication.</b> You cannot fire ceramic around electronics, so a ceramicist is the natural first collaborator.</li>
+          <li><b>Loss.</b> Track seeds by device presence only, and accept some as the cost of an edition people hold.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="label">the build</span><h2>Order of operations</h2></div>
+    <div class="steps">
+      <div class="step"><span class="st done">done</span><div class="sl"><b>Pulse into the growth gate</b><span>Web Serial input with a simulated fallback, cardiac term in the engine <code>tick(hand, dt, cardiac?)</code>.</span></div></div>
+      <div class="step"><span class="st done">done</span><div class="sl"><b>Petals breathe on the beat</b><span>A systole swell and emissive lift synced to <code>cardiac.phase</code>, only when a pulse is present.</span></div></div>
+      <div class="step"><span class="st done">done</span><div class="sl"><b>Sensor node firmware</b><span>ESP32 + MAX30102 emitting <code>B&lt;bpm&gt;</code>, in <code>hardware/pulse_node/</code>.</span></div></div>
+      <div class="step"><span class="st done">done</span><div class="sl"><b>Sound concept A</b><span>The auscultation, generative Web Audio driven by growth and pulse, in <code>src/sound/altarSound.ts</code>.</span></div></div>
+      <div class="step"><span class="st next">next</span><div class="sl"><b>Bench the altar</b><span>Flash the node, connect over Web Serial in <code>?altar=1</code>, watch a flower grow on a real heartbeat.</span></div></div>
+      <div class="step"><span class="st later">then</span><div class="sl"><b>Haptic beat-back</b><span>The dome plays the flower's drifting rhythm (app sends it back to the board).</span></div></div>
+      <div class="step"><span class="st later">then</span><div class="sl"><b>Plinth, gauze, camera</b><span>Fabricate the altar and run it as a kiosk. Document: this video is the ISEA / SIGGRAPH submission.</span></div></div>
+      <div class="step"><span class="st later">last</span><div class="sl"><b>The seed</b><span>Prototype f as the altar's companion, once the altar works.</span></div></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    vanitas (repo <a href="https://github.com/binyoun/gelora-soil">gelora-soil</a>), Gelora lineage. Directions b and f from the exhibition review, developed 2026. Aligns to Sensing Otherwise: 맥 as the work's clock, care as diagnosis not command, the bowl as the collective dead. Nothing is stored.
+  </div>
+</footer>
+
+<script>
+  (function () {
+    var canvas = document.getElementById('pulse-canvas');
+    if (!canvas) return;
+    var ctx = canvas.getContext('2d');
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var W = 0, H = 0;
+    function accent() { return getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#8fd4f0'; }
+    function resize() { W = canvas.clientWidth; H = canvas.clientHeight; canvas.width = W * dpr; canvas.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+    function beat(t) {
+      var d = t - 0.5;
+      var qrs = Math.exp(-Math.pow(d * 34, 2)) * 1.0
+              - Math.exp(-Math.pow((d + 0.028) * 60, 2)) * 0.28
+              - Math.exp(-Math.pow((d - 0.03) * 55, 2)) * 0.42;
+      var pWave = Math.exp(-Math.pow((d + 0.16) * 26, 2)) * 0.14;
+      var tWave = Math.exp(-Math.pow((d - 0.2) * 16, 2)) * 0.2;
+      return pWave + qrs + tWave;
+    }
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var offset = 0;
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+      var col = accent();
+      var mid = H * 0.6, amp = H * 0.36, period = 300;
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      ctx.strokeStyle = col; ctx.lineWidth = 1.7;
+      ctx.shadowColor = col; ctx.shadowBlur = 16; ctx.globalAlpha = 0.95;
+      ctx.beginPath();
+      for (var x = 0; x <= W; x += 2) {
+        var phase = ((x + offset) % period) / period;
+        var y = mid - beat(phase) * amp;
+        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    }
+    function loop() { offset += 1.2; draw(); if (!reduce) requestAnimationFrame(loop); }
+    window.addEventListener('resize', function () { resize(); if (reduce) draw(); });
+    resize();
+    if (reduce) draw(); else loop();
+    new MutationObserver(function () { if (reduce) draw(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  })();
+</script>
