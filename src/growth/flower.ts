@@ -17,6 +17,7 @@ interface PetalParam {
   tiltBias: number;
   z: number;
   swayPhase: number;
+  swayAmp?: number; // bilateral parts: how much this part drifts (tails > sepals)
   rest?: { pos: THREE.Vector3; rotZ: number }; // bilateral parts (ghost orchid)
 }
 
@@ -159,16 +160,16 @@ export class Flower {
 
   private buildGhostOrchid(template: FlowerTemplate, rand: () => number): void {
     const b = template.petal;
-    const parts: Array<{ shape: PetalShape; angleDeg: number; rotZDeg: number; pos: [number, number, number]; scale: number }> = [
+    const parts: Array<{ shape: PetalShape; angleDeg: number; rotZDeg: number; pos: [number, number, number]; scale: number; sway: number }> = [
       // slender upper sepals, gently curved outward
-      { shape: { ...b, width: 0.075, sharp: 2.0, curl: 0.12 }, angleDeg: 90, rotZDeg: 0, pos: [0, 0.0, 0.04], scale: 0.9 }, // dorsal (up)
-      { shape: { ...b, width: 0.07, sharp: 2.1, strap: 0.15, bend: 0.28 }, angleDeg: 150, rotZDeg: 60, pos: [0, 0.03, 0.03], scale: 1.0 }, // lateral (up-left)
-      { shape: { ...b, width: 0.07, sharp: 2.1, strap: 0.15, bend: -0.28 }, angleDeg: 30, rotZDeg: -60, pos: [0, 0.03, 0.03], scale: 1.0 }, // lateral (up-right)
+      { shape: { ...b, width: 0.075, sharp: 2.0, curl: 0.12 }, angleDeg: 90, rotZDeg: 0, pos: [0, 0.0, 0.04], scale: 0.9, sway: 0.1 }, // dorsal (up)
+      { shape: { ...b, width: 0.07, sharp: 2.1, strap: 0.15, bend: 0.28 }, angleDeg: 150, rotZDeg: 60, pos: [0, 0.03, 0.03], scale: 1.0, sway: 0.13 }, // lateral (up-left)
+      { shape: { ...b, width: 0.07, sharp: 2.1, strap: 0.15, bend: -0.28 }, angleDeg: 30, rotZDeg: -60, pos: [0, 0.03, 0.03], scale: 1.0, sway: 0.13 }, // lateral (up-right)
       // the lip (labellum): broad, cupped, softly waved
-      { shape: { ...b, width: 0.4, sharp: 0.95, cup: 0.52, waveAmp: 0.06, waveFreq: 6, curl: 0.12 }, angleDeg: 270, rotZDeg: 180, pos: [0, -0.03, 0.05], scale: 1.05 }, // lip (down)
+      { shape: { ...b, width: 0.4, sharp: 0.95, cup: 0.52, waveAmp: 0.06, waveFreq: 6, curl: 0.12 }, angleDeg: 270, rotZDeg: 180, pos: [0, -0.03, 0.05], scale: 1.05, sway: 0.06 }, // lip (down)
       // the two long curling tails ("frog legs"), the signature of the ghost orchid
-      { shape: { ...b, width: 0.032, sharp: 1.0, strap: 0.85, curl: 0.04, bend: -0.55 }, angleDeg: 250, rotZDeg: 180 - 20, pos: [-0.02, -0.14, 0.0], scale: 1.85 }, // tail (left)
-      { shape: { ...b, width: 0.032, sharp: 1.0, strap: 0.85, curl: 0.04, bend: 0.55 }, angleDeg: 290, rotZDeg: 180 + 20, pos: [0.02, -0.14, 0.0], scale: 1.85 }, // tail (right)
+      { shape: { ...b, width: 0.032, sharp: 1.0, strap: 0.85, curl: 0.04, bend: -0.55 }, angleDeg: 250, rotZDeg: 180 - 20, pos: [-0.02, -0.14, 0.0], scale: 1.85, sway: 0.28 }, // tail (left)
+      { shape: { ...b, width: 0.032, sharp: 1.0, strap: 0.85, curl: 0.04, bend: 0.55 }, angleDeg: 290, rotZDeg: 180 + 20, pos: [0.02, -0.14, 0.0], scale: 1.85, sway: 0.28 }, // tail (right)
     ];
     for (const part of parts) {
       const wedge = 60 * DEG;
@@ -183,6 +184,7 @@ export class Flower {
         tiltBias: 0,
         z: part.pos[2],
         swayPhase: rand() * Math.PI * 2,
+        swayAmp: part.sway,
         rest: { pos: new THREE.Vector3(part.pos[0], part.pos[1], part.pos[2]), rotZ: part.rotZDeg * DEG },
       });
     }
@@ -275,10 +277,15 @@ export class Flower {
       const m = p.mesh;
 
       if (p.rest) {
-        // bilateral part (ghost orchid): fixed orientation, scales in, sways
-        m.position.set(p.rest.pos.x * petalLen, p.rest.pos.y * petalLen, p.rest.pos.z * petalLen);
+        // bilateral part (ghost orchid): floats, the long tails drifting from
+        // their base like it hangs in still air
+        const amp = p.swayAmp ?? 0.1;
+        const swingZ = (Math.sin(time * 0.9 + p.swayPhase) + 0.4 * Math.sin(time * 1.9 + p.swayPhase * 1.7)) * amp;
+        const swingX = Math.sin(time * 0.7 + p.swayPhase * 0.6) * amp * 0.8;
+        const bob = Math.sin(time * 0.8 + p.swayPhase) * amp * 0.06;
+        m.position.set(p.rest.pos.x * petalLen, p.rest.pos.y * petalLen + bob * petalLen, p.rest.pos.z * petalLen);
         if (petal.detached) m.position.y -= petal.fallProgress * petalLen * 2.5;
-        m.rotation.set(0, 0, p.rest.rotZ + sway * 0.3);
+        m.rotation.set(swingX, 0, p.rest.rotZ + swingZ);
       } else {
         // radial petal: distribute around the head, tilt from bud to open
         const tilt = this.closeExtra * DEG * (1 - unfold) + this.openBase * DEG + p.tiltBias + wilt * 40 * DEG;
