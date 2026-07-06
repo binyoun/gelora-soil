@@ -21,12 +21,11 @@ const videoEl = document.getElementById('camera-feed') as HTMLVideoElement;
 const sceneCanvas = document.getElementById('scene') as HTMLCanvasElement;
 const debugCanvas = document.getElementById('debug-overlay') as HTMLCanvasElement;
 const landingEl = document.getElementById('landing')!;
-const beginButton = document.getElementById('begin') as HTMLButtonElement;
-const loaderEl = document.getElementById('loader')!;
+const chevLeftBtn = document.getElementById('chev-left') as HTMLButtonElement;
+const chevRightBtn = document.getElementById('chev-right') as HTMLButtonElement;
 const backButton = document.getElementById('back') as HTMLButtonElement;
 const flowerNameEl = document.getElementById('flower-name')!;
 const flowerTagEl = document.getElementById('flower-tag')!;
-const flowerDotsEl = document.getElementById('flower-dots')!;
 const ctxEl = document.getElementById('context')!;
 const ctxNameEl = document.getElementById('ctx-name')!;
 const ctxStoryEl = document.getElementById('ctx-story')!;
@@ -90,6 +89,8 @@ let lastFrameMs = performance.now();
 
 let mode: 'landing' | 'ar' = 'landing';
 let cameraReady = false;
+let starting = false;
+let flowerIndex = 0;
 let preview: Flower | null = null;
 const previewDna = makeDummyDna();
 const previewGrowth = new GrowthEngine(previewDna);
@@ -99,24 +100,25 @@ const PREVIEW_HAND_SCALE = 0.14;
 let placeholderTex: THREE.CanvasTexture | null = null;
 
 async function begin(): Promise<void> {
+  if (starting || mode !== 'landing') return;
+  starting = true;
   if (!cameraReady) {
-    loaderEl.classList.add('active');
-    beginButton.classList.add('hidden');
+    landingEl.classList.add('loading');
     try {
       await camera.start('user'); // front camera: the selfie becomes the flower
       await Promise.all([initHandLandmarker(), initSegmenter()]);
     } catch (err) {
       console.error(err);
-      loaderEl.classList.remove('active');
-      beginButton.classList.remove('hidden');
+      landingEl.classList.remove('loading');
+      starting = false;
       flowerNameEl.textContent = 'camera access denied';
       return;
     }
     cameraReady = true;
     applyVideoMetrics();
-    loaderEl.classList.remove('active');
-    beginButton.classList.remove('hidden');
+    landingEl.classList.remove('loading');
   }
+  starting = false;
   enterAR();
 }
 
@@ -151,12 +153,37 @@ function applyVideoMetrics(): void {
   arScene.setVideoMetrics(aspect, mirror);
 }
 
-beginButton.addEventListener('click', () => {
-  begin().catch((err) => console.error(err));
-});
-
 backButton.addEventListener('click', () => {
   if (mode === 'ar') goBack();
+});
+
+// Landing: swipe left/right (or tap the chevrons) to change flower; tap to begin.
+function changeFlower(delta: number): void {
+  flowerIndex = (flowerIndex + delta + TEMPLATES.length) % TEMPLATES.length;
+  selectFlower(flowerIndex);
+}
+chevLeftBtn.addEventListener('click', (e) => { e.stopPropagation(); changeFlower(-1); });
+chevRightBtn.addEventListener('click', (e) => { e.stopPropagation(); changeFlower(1); });
+
+let touchStartX = 0;
+let touchStartY = 0;
+let touchStartT = 0;
+window.addEventListener('pointerdown', (e) => {
+  if (mode !== 'landing') return;
+  touchStartX = e.clientX;
+  touchStartY = e.clientY;
+  touchStartT = performance.now();
+});
+window.addEventListener('pointerup', (e) => {
+  if (mode !== 'landing' || starting) return;
+  const dx = e.clientX - touchStartX;
+  const dy = e.clientY - touchStartY;
+  const dt = performance.now() - touchStartT;
+  if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) {
+    changeFlower(dx < 0 ? 1 : -1); // swipe left -> next
+  } else if (Math.abs(dx) < 12 && Math.abs(dy) < 12 && dt < 500) {
+    if (!(e.target as HTMLElement).closest('.chev')) begin().catch((err) => console.error(err));
+  }
 });
 
 videoEl.addEventListener('loadedmetadata', applyVideoMetrics);
@@ -177,22 +204,14 @@ sceneCanvas.addEventListener('pointerdown', () => {
   if (mode === 'ar' && stageMachine.stage === 'ENDED') restartRequested = true;
 });
 
-// Minimal visual chooser: a dot per flower; selecting swaps the rotating preview.
+// Swaps the rotating preview to flower i and updates the name/tag.
 function selectFlower(i: number): void {
+  flowerIndex = i;
   selectedTemplate = TEMPLATES[i]!;
-  flowerDotsEl.querySelectorAll('.dot').forEach((el, j) => el.classList.toggle('selected', j === i));
   flowerNameEl.textContent = selectedTemplate.name;
   flowerTagEl.textContent = tagFor(selectedTemplate.id);
   buildPreview();
 }
-TEMPLATES.forEach((_, i) => {
-  const dot = document.createElement('button');
-  dot.type = 'button';
-  dot.className = 'dot';
-  dot.setAttribute('aria-label', TEMPLATES[i]!.name);
-  dot.addEventListener('click', () => selectFlower(i));
-  flowerDotsEl.appendChild(dot);
-});
 
 function tagFor(id: string): string {
   switch (id) {
