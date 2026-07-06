@@ -1,93 +1,141 @@
-// vanitas :: pulse-ground altar (Oryn maek) :: sensor node
+// vanitas :: pulse-ground altar (Oryn maek) :: sensor + haptic node
 //
-// Reads a heartbeat from a MAX30102 pulse sensor and prints the beats-per-minute
-// over USB serial in the exact protocol the web app expects:
+// Reads a heartbeat from a MAX30102 and streams beats-per-minute to the browser,
+// and plays a haptic beat-back in the dome on command from the app.
 //
-//     B<bpm>\n     one line per detected beat, e.g. "B72"
+//   OUT  B<bpm>\n        one line per detected beat, e.g. "B72"     (node -> app)
+//   IN   H<strength>\n    fire one haptic pulse, strength 0..100     (app -> node)
 //
-// The browser (src/sensors/pulse.ts) opens this port over Web Serial at 115200
-// baud and feeds each beat into the flower's growth. No hardware, no problem:
-// the app runs a simulated pulse until a real board is connected.
+// The app (src/sensors/pulse.ts) opens this port over Web Serial at 115200 baud.
+// The haptic plays the flower's OWN drifting rhythm, which lives in the app, so
+// the app decides when to beat and sends H on each flower-beat; strength falls as
+// the flower dies. The visitor hears their own pulse (in the app's audio) and
+// feels the flower's separate, diverging pulse here in the dome.
 //
-// Board:   any ESP32 dev board with a USB-serial bridge (CP2102 / CH340).
-// Sensor:  MAX30102 breakout (the MAX3010x family; the SparkFun MAX3010x library
-//          drives the MAX30102 as well as the MAX30105).
-// Library: "SparkFun MAX3010x Pulse and Proximity Sensor Library"
-//          (Arduino Library Manager). Provides MAX30105.h + heartRate.h.
+// No hardware, no problem: the app runs a simulated pulse and simply sends no H
+// commands until a board is connected.
 //
-// Wiring (I2C):
-//     MAX30102 VIN -> ESP32 3V3
-//     MAX30102 GND -> ESP32 GND
-//     MAX30102 SDA -> ESP32 GPIO21 (default SDA)
-//     MAX30102 SCL -> ESP32 GPIO22 (default SCL)
+// Board:   ESP32 dev board with a USB-serial bridge (CP2102 / CH340).
+// Sensors: MAX30102 pulse breakout (I2C 0x57).
+// Haptic:  Adafruit DRV2605L haptic driver (I2C 0x5A) with an LRA actuator.
+//          Both share the I2C bus (different addresses), no conflict.
+// Libs:    "SparkFun MAX3010x Pulse and Proximity Sensor Library" (MAX30105.h,
+//          heartRate.h) and "Adafruit DRV2605 Library" (Arduino Library Manager).
 //
-// Contact: PPG is most reliable on a fingertip. In the altar, guide the finger
-// (or the fleshy heart-point of the palm) to rest lightly and still on the
-// sensor window under the brass/porcelain dome. Too much pressure kills the
-// signal; aim for resting contact.
+// Wiring (I2C, shared):
+//     VIN  -> ESP32 3V3        SDA -> ESP32 GPIO21
+//     GND  -> ESP32 GND        SCL -> ESP32 GPIO22
+//     DRV2605 OUT+/OUT- -> LRA actuator leads.
 
 #include <Wire.h>
 #include "MAX30105.h"
 #include "heartRate.h"
+#include <Adafruit_DRV2605.h>
 
 MAX30105 sensor;
+Adafruit_DRV2605 haptic;
+bool hapticReady = false;
 
-// Rolling average over the last few beats, so the reported BPM is steady rather
-// than jumping on every interval. The app derives its own "calm" (steadiness)
-// metric on top of this.
+// --- pulse sensing (node -> app) ---
 const byte RATE_SIZE = 8;
 byte rates[RATE_SIZE];
 byte rateSpot = 0;
 long lastBeatMs = 0;
 int beatAvg = 0;
-
-// Below this IR reading there is no finger/palm on the sensor. While absent we
-// stay silent (the app falls back to its simulated pulse after a short timeout).
 const long FINGER_IR_THRESHOLD = 50000;
+
+// --- haptic beat-back (app -> node) ---
+// A soft thump envelope in realtime mode: quick attack, short decay, so it reads
+// as a heartbeat rather than a hard click.
+String inLine = "";
+long hapticStartMs = -1;
+int hapticPeak = 0;               // 0..127 realtime drive at the peak
+const int HAPTIC_ATTACK_MS = 18;
+const int HAPTIC_DECAY_MS = 120;
 
 void setup() {
   Serial.begin(115200);
   delay(200);
 
   if (!sensor.begin(Wire, I2C_SPEED_FAST)) {
-    // Sensor not found. Retry forever so a loose cable recovers on reseat.
     while (true) {
       Serial.println("# MAX30102 not found, check wiring");
       delay(1500);
     }
   }
-
-  // Gentle red LED, green off: enough for a clean PPG without cooking the sensor.
   sensor.setup();
   sensor.setPulseAmplitudeRed(0x0A);
   sensor.setPulseAmplitudeGreen(0);
+
+  if (haptic.begin()) {
+    haptic.useLRA();                 // configure for a linear resonant actuator
+    haptic.setMode(DRV2605_MODE_REALTIME);
+    haptic.setRealtimeValue(0);
+    hapticReady = true;
+  } else {
+    Serial.println("# DRV2605 not found (haptic disabled)");
+  }
 
   Serial.println("# pulse node ready");
 }
 
 void loop() {
-  long ir = sensor.getIR();
+  handleIncoming();     // app -> node commands (H)
+  updateHaptic();       // run the haptic thump envelope
+  updatePulse();        // node -> app beats (B)
+}
 
-  if (ir < FINGER_IR_THRESHOLD) {
-    // No contact: reset the running average so the next hand starts clean.
-    lastBeatMs = 0;
+// Parse H<strength> lines from the app and arm a haptic thump.
+void handleIncoming() {
+  while (Serial.available()) {
+    char c = Serial.read();
+    if (c == '\n' || c == '\r') {
+      if (inLine.length() > 1 && (inLine[0] == 'H' || inLine[0] == 'h')) {
+        int strength = inLine.substring(1).toInt();   // 0..100
+        strength = constrain(strength, 0, 100);
+        hapticPeak = map(strength, 0, 100, 0, 127);
+        hapticStartMs = millis();
+      }
+      inLine = "";
+    } else if (inLine.length() < 12) {
+      inLine += c;
+    }
+  }
+}
+
+void updateHaptic() {
+  if (!hapticReady || hapticStartMs < 0) return;
+  long age = millis() - hapticStartMs;
+  int value = 0;
+  if (age < HAPTIC_ATTACK_MS) {
+    value = (int)((long)hapticPeak * age / HAPTIC_ATTACK_MS);
+  } else if (age < HAPTIC_ATTACK_MS + HAPTIC_DECAY_MS) {
+    long d = age - HAPTIC_ATTACK_MS;
+    value = (int)((long)hapticPeak * (HAPTIC_DECAY_MS - d) / HAPTIC_DECAY_MS);
+  } else {
+    haptic.setRealtimeValue(0);
+    hapticStartMs = -1;             // envelope finished
     return;
   }
+  haptic.setRealtimeValue(constrain(value, 0, 127));
+}
 
+void updatePulse() {
+  long ir = sensor.getIR();
+  if (ir < FINGER_IR_THRESHOLD) {
+    lastBeatMs = 0;                 // no contact: reset so the next hand starts clean
+    return;
+  }
   if (checkForBeat(ir)) {
     long now = millis();
     if (lastBeatMs > 0) {
-      long delta = now - lastBeatMs;
-      float bpm = 60.0f / (delta / 1000.0f);
+      float bpm = 60.0f / ((now - lastBeatMs) / 1000.0f);
       if (bpm > 20 && bpm < 240) {
         rates[rateSpot++] = (byte)bpm;
         rateSpot %= RATE_SIZE;
-
         int sum = 0;
         for (byte i = 0; i < RATE_SIZE; i++) sum += rates[i];
         beatAvg = sum / RATE_SIZE;
-
-        // The one line the app parses.
         Serial.print('B');
         Serial.println(beatAvg);
       }

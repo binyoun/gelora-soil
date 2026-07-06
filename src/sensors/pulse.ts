@@ -32,6 +32,7 @@ interface SerialPortLike {
   open(options: { baudRate: number }): Promise<void>;
   close(): Promise<void>;
   readable: ReadableStream<Uint8Array> | null;
+  writable: WritableStream<Uint8Array> | null;
 }
 interface SerialLike {
   requestPort(): Promise<SerialPortLike>;
@@ -52,6 +53,8 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
 export class PulseSensor {
   private port: SerialPortLike | null = null;
   private reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+  private writer: WritableStreamDefaultWriter<Uint8Array> | null = null;
+  private encoder = new TextEncoder();
   private lineBuffer = '';
   private live = false;
 
@@ -89,6 +92,7 @@ export class PulseSensor {
       await port.open({ baudRate: BAUD });
       this.port = port;
       this.live = true;
+      if (port.writable) this.writer = port.writable.getWriter();
       this.readLoop().catch((err) => {
         console.error('pulse read loop ended', err);
         this.live = false;
@@ -110,11 +114,30 @@ export class PulseSensor {
     }
     this.reader = null;
     try {
+      this.writer?.releaseLock();
+    } catch {
+      /* ignore */
+    }
+    this.writer = null;
+    try {
       await this.port?.close();
     } catch {
       /* ignore */
     }
     this.port = null;
+  }
+
+  /**
+   * Send one haptic beat to the dome (Øryn 맥 beat-back). The board plays the
+   * flower's own drifting rhythm, so the app drives the timing. `strength` is
+   * 0..1 vitality. No-op when there is no real board (simulated mode).
+   */
+  sendHaptic(strength: number): void {
+    if (!this.writer) return;
+    const v = Math.round(Math.max(0, Math.min(1, strength)) * 100);
+    this.writer.write(this.encoder.encode(`H${v}\n`)).catch(() => {
+      /* board unplugged mid-write: ignore, simulated pulse continues */
+    });
   }
 
   private async readLoop(): Promise<void> {

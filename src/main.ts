@@ -6,6 +6,7 @@ import { buildHandState } from './hand/gestures';
 import { initHandLandmarker, detectHands } from './hand/landmarker';
 import { PalmStabilityTracker, type RawLandmark } from './hand/palm';
 import { GrowthEngine } from './growth/engine';
+import { FlowerHeart } from './growth/flowerHeart';
 import { PulseSensor } from './sensors/pulse';
 import { AltarSound } from './sound/altarSound';
 import { Flower } from './growth/flower';
@@ -71,6 +72,7 @@ const ALTAR_MODE = new URLSearchParams(window.location.search).get('altar') === 
 const pulse = new PulseSensor();
 const altarSound = new AltarSound();
 altarSound.setEnabled(ALTAR_MODE);
+const flowerHeart = new FlowerHeart(); // the flower's own drifting pulse, for the dome haptic
 
 const camera = new Camera(videoEl);
 const arScene = new ARScene(sceneCanvas);
@@ -481,6 +483,15 @@ function loop(nowMs: number): void {
     roots?.update(primaryRaw, ctx, maturity);
     if (currentDna) flower?.update(currentDna, state, originWorld, handScale, hand.present, t, dtSeconds, cardiacIn ? cardiac.phase : null);
     altarSound.update(state, cardiacIn, hand.present, dtSeconds);
+
+    // Haptic beat-back: the dome plays the flower's own drifting rhythm. sendHaptic
+    // is a no-op without a real board, so this is safe in simulated mode.
+    if (cardiacIn && hand.present) {
+      const fb = flowerHeart.update(cardiac.bpm, state.maturity, state.wiltAmount, dtSeconds);
+      if (fb.beat) pulse.sendHaptic(fb.strength);
+    } else {
+      flowerHeart.reset();
+    }
   }
 
   if (revealStartMs !== null) {
