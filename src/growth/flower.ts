@@ -171,6 +171,19 @@ export class Flower {
       { shape: { ...b, width: 0.032, sharp: 1.0, strap: 0.85, curl: 0.04, bend: -0.55 }, angleDeg: 250, rotZDeg: 180 - 20, pos: [-0.02, -0.14, 0.0], scale: 1.85, sway: 0.28 }, // tail (left)
       { shape: { ...b, width: 0.032, sharp: 1.0, strap: 0.85, curl: 0.04, bend: 0.55 }, angleDeg: 290, rotZDeg: 180 + 20, pos: [0.02, -0.14, 0.0], scale: 1.85, sway: 0.28 }, // tail (right)
     ];
+    // a little whorl of small petals at the heart, radiating forward (a rosette)
+    const little = 5;
+    for (let i = 0; i < little; i++) {
+      const aDeg = (i / little) * 360 + 18;
+      parts.push({
+        shape: { ...b, width: 0.06, sharp: 1.7, cup: 0.28, curl: 0.22 },
+        angleDeg: aDeg,
+        rotZDeg: aDeg - 90, // radiate outward from centre
+        pos: [0, 0, 0.09],
+        scale: 0.36,
+        sway: 0.16,
+      });
+    }
     for (const part of parts) {
       const wedge = 60 * DEG;
       const geo = buildPetalGeometry(part.shape, part.angleDeg * DEG, wedge, 0.42, rand);
