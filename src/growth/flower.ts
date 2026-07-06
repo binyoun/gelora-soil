@@ -165,8 +165,9 @@ export class Flower {
       { shape: { ...b, width: 0.075, sharp: 2.0, curl: 0.12 }, angleDeg: 90, rotZDeg: 0, pos: [0, 0.0, 0.04], scale: 0.9, sway: 0.1 }, // dorsal (up)
       { shape: { ...b, width: 0.07, sharp: 2.1, strap: 0.15, bend: 0.28 }, angleDeg: 150, rotZDeg: 60, pos: [0, 0.03, 0.03], scale: 1.0, sway: 0.13 }, // lateral (up-left)
       { shape: { ...b, width: 0.07, sharp: 2.1, strap: 0.15, bend: -0.28 }, angleDeg: 30, rotZDeg: -60, pos: [0, 0.03, 0.03], scale: 1.0, sway: 0.13 }, // lateral (up-right)
-      // the lip (labellum): broad, cupped, softly waved
-      { shape: { ...b, width: 0.44, sharp: 0.9, cup: 0.72, waveAmp: 0.06, waveFreq: 6, curl: 0.2, bulge: 0.42 }, angleDeg: 270, rotZDeg: 180, pos: [0, -0.03, 0.05], scale: 1.12, sway: 0.06 }, // lip (down): voluminous pouch
+      // the lip (labellum): two cupped, voluminous lobes with a cleft down the middle
+      { shape: { ...b, width: 0.27, sharp: 0.95, cup: 0.74, waveAmp: 0.06, waveFreq: 6, curl: 0.2, bulge: 0.44 }, angleDeg: 258, rotZDeg: 180 + 14, pos: [-0.02, -0.03, 0.05], scale: 1.1, sway: 0.07 }, // lip lobe (left)
+      { shape: { ...b, width: 0.27, sharp: 0.95, cup: 0.74, waveAmp: 0.06, waveFreq: 6, curl: 0.2, bulge: 0.44 }, angleDeg: 282, rotZDeg: 180 - 14, pos: [0.02, -0.03, 0.05], scale: 1.1, sway: 0.07 }, // lip lobe (right)
       // the two long curling tails ("frog legs"), the signature of the ghost orchid
       { shape: { ...b, width: 0.032, sharp: 1.0, strap: 0.85, curl: 0.04, bend: -0.55 }, angleDeg: 250, rotZDeg: 180 - 20, pos: [-0.02, -0.14, 0.0], scale: 1.85, sway: 0.28 }, // tail (left)
       { shape: { ...b, width: 0.032, sharp: 1.0, strap: 0.85, curl: 0.04, bend: 0.55 }, angleDeg: 290, rotZDeg: 180 + 20, pos: [0.02, -0.14, 0.0], scale: 1.85, sway: 0.28 }, // tail (right)
