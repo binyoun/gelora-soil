@@ -45,6 +45,8 @@ export interface FlowerTemplate {
   emissive: number;
   emissiveIntensity: number;
   glowTint: number; // pour-residue glow colour
+  swayAmp?: number; // per-petal flutter (radial), default 0.06
+  breatheAmp?: number; // whole-bloom open/close breathing + head nod, default 0
 }
 
 export const TEMPLATES: FlowerTemplate[] = [
@@ -54,20 +56,22 @@ export const TEMPLATES: FlowerTemplate[] = [
     story: 'a tulip whose flamed beauty was a virus that killed it. extinct.',
     symmetry: 'radial',
     layers: [
-      { count: 3, rMax: 0.4, scale: 1.0, tiltBias: 0, z: 0.0 },
-      { count: 3, rMax: 0.27, scale: 0.86, tiltBias: 18 * DEG, z: 0.06 },
+      { count: 3, rMax: 0.42, scale: 1.0, tiltBias: 0, z: 0.0 }, // outer whorl, broader
+      { count: 3, rMax: 0.28, scale: 0.82, tiltBias: 20 * DEG, z: 0.06 }, // inner whorl, narrower and more upright
     ],
-    petal: { width: 0.5, sharp: 0.85, curl: 0.12, cup: 0.5, waveAmp: 0.03, waveFreq: 4, strap: 0, bulge: 0.24 },
-    openBaseDeg: 48,
-    closeExtraDeg: 22,
+    petal: { width: 0.46, sharp: 0.98, curl: 0.16, cup: 0.56, waveAmp: 0.06, waveFreq: 9, strap: 0, bulge: 0.24 }, // feathered "broken" edge, pointed chalice
+    openBaseDeg: 46,
+    closeExtraDeg: 24,
     center: 'tuft',
     centerScale: 0.15,
     centerColor: 0x2a1a0a,
     stem: true,
-    roughness: 0.52,
+    roughness: 0.5,
     emissive: 0x000000,
     emissiveIntensity: 0,
     glowTint: 0x5cc4e8,
+    swayAmp: 0.075,
+    breatheAmp: 0.13,
   },
   {
     id: 'chrysanthemum',

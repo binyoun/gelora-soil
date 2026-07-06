@@ -40,6 +40,8 @@ export class Flower {
   private openBase: number;
   private closeExtra: number;
   private centerScaleFactor: number;
+  private swayAmp: number;
+  private breatheAmp: number;
 
   private particlePos: Float32Array;
   private particleVelocities: Float32Array;
@@ -58,6 +60,8 @@ export class Flower {
     this.openBase = template.openBaseDeg;
     this.closeExtra = template.closeExtraDeg;
     this.centerScaleFactor = template.centerScale;
+    this.swayAmp = template.swayAmp ?? 0.06;
+    this.breatheAmp = template.breatheAmp ?? 0;
 
     this.mat = new THREE.MeshStandardMaterial({
       map: photo,
@@ -269,7 +273,14 @@ export class Flower {
       originWorld.y + lift + (Math.random() - 0.5) * jitterAmp,
       originWorld.z,
     );
-    this.group.rotation.set(wilt * 0.7 + Math.sin(time * 0.5) * 0.02, Math.sin(time * 0.35) * 0.03, Math.sin(time * 0.6) * 0.03);
+    // gentle head nod, amplified for flowers that "breathe" (the tulip)
+    const nod = this.breatheAmp;
+    this.group.rotation.set(
+      wilt * 0.7 + Math.sin(time * 0.5) * (0.02 + nod * 0.5),
+      Math.sin(time * 0.35) * 0.03,
+      Math.sin(time * 0.6) * (0.03 + nod * 0.4),
+    );
+    const breathe = this.breatheAmp * Math.sin(time * 0.55); // whole-bloom open/close
 
     if (this.stem) {
       this.stem.scale.set(handScale, lift, handScale);
@@ -285,7 +296,7 @@ export class Flower {
     for (let i = 0; i < this.petals.length; i++) {
       const p = this.petals[i]!;
       const petal = growth.petals[i % nState]!;
-      const sway = Math.sin(time * 1.2 + p.swayPhase) * 0.06 * unfold;
+      const sway = Math.sin(time * 1.2 + p.swayPhase) * this.swayAmp * unfold;
       const fallShrink = petal.detached ? Math.max(0, 1 - petal.fallProgress) : 1;
       const scale = petalLen * p.scale * fallShrink;
       const m = p.mesh;
@@ -301,8 +312,9 @@ export class Flower {
         if (petal.detached) m.position.y -= petal.fallProgress * petalLen * 2.5;
         m.rotation.set(swingX, 0, p.rest.rotZ + swingZ);
       } else {
-        // radial petal: distribute around the head, tilt from bud to open
-        const tilt = this.closeExtra * DEG * (1 - unfold) + this.openBase * DEG + p.tiltBias + wilt * 40 * DEG;
+        // radial petal: distribute around the head, tilt from bud to open, plus a
+        // shared breathing that opens and closes the whole bloom
+        const tilt = this.closeExtra * DEG * (1 - unfold) + this.openBase * DEG + p.tiltBias + wilt * 40 * DEG + breathe * unfold;
         m.position.set(0, 0, p.z * petalLen);
         if (petal.detached) m.position.y -= petal.fallProgress * petalLen * 2.5;
         m.rotation.set(0, 0, 0);
