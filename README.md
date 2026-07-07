@@ -14,7 +14,7 @@ A contemporary vanitas. Where the Dutch still-life set beauty beside a skull, th
 
 The interaction grammar is care, stillness, and duration: the flower takes root only while the hand is offered and still, and it is never saved. Vanity, beauty, and transience become the same gesture.
 
-### The four flowers
+### The seven flowers
 
 Each is extinct, endangered, or ephemeral. You wear whichever you choose.
 
@@ -22,6 +22,9 @@ Each is extinct, endangered, or ephemeral. You wear whichever you choose.
 - **Chrysanthemum**. The flower of graves and mourning across Europe and East Asia.
 - **Kadupul** (a night-blooming cereus). Blooms once at night and dies by dawn; it cannot be picked without dying.
 - **Ghost orchid**. Endangered, rootless, seeming to float in the dark.
+- **Franklinia**. A tree found once beside a river in Georgia, extinct in the wild since 1803; every specimen alive was grown from a cutting.
+- **Koki'o** (Kokia cookei). A Hawaiian tree once reduced to a single plant, kept alive only by grafting it onto its relatives.
+- **Rafflesia**. The corpse flower, the largest bloom on earth; it opens for a few days, smells of the dead, and rots. Endangered as its forests fall.
 
 ---
 

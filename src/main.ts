@@ -276,6 +276,9 @@ function tagFor(id: string): string {
     case 'chrysanthemum': return 'the dead';
     case 'kadupul': return 'one night only';
     case 'ghost': return 'endangered';
+    case 'franklinia': return 'lost from the wild';
+    case 'kokio': return 'critically rare';
+    case 'rafflesia': return 'ephemeral';
     default: return '';
   }
 }
