@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <title>vanitas :: glitch lab</title>
+  <style>
+    :root { color-scheme: dark; --ink: #f2efe9; --muted: rgba(242,239,233,0.6); --line: rgba(242,239,233,0.16); --accent: #8fd4f0; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; height: 100%; background: radial-gradient(ellipse at 50% 35%, #15100b 0%, #050505 72%); overflow: hidden; }
+    body { font-family: ui-monospace, 'SF Mono', Menlo, monospace; color: var(--ink); }
+    canvas#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+    #panel {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 2;
+      background: linear-gradient(180deg, rgba(5,5,5,0) 0%, rgba(5,5,5,0.82) 22%);
+      padding: 2rem 1rem max(1rem, env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 0.7rem;
+      max-height: 62%; overflow-y: auto;
+    }
+    #panel .top { display: flex; flex-wrap: wrap; gap: 0.7rem 1.2rem; align-items: center; }
+    #panel label.field { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.72rem; letter-spacing: 0.06em; color: var(--muted); }
+    select, input[type=range] { font-family: inherit; }
+    select { background: rgba(0,0,0,0.4); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 0.35em 0.5em; font-size: 0.75rem; }
+    input[type=range] { accent-color: var(--accent); width: 130px; }
+    #fx { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: 0.4rem 0.8rem; }
+    #fx label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; letter-spacing: 0.04em; padding: 0.3rem 0.1rem; cursor: pointer; }
+    #fx input { accent-color: var(--accent); width: 15px; height: 15px; }
+    #fx label.on { color: var(--accent); }
+    .btns { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+    button { font-family: inherit; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: lowercase; color: var(--ink);
+      background: rgba(242,239,233,0.08); border: 1px solid var(--line); border-radius: 20px; padding: 0.5em 1.1em; cursor: pointer; }
+    button:active { background: rgba(242,239,233,0.18); }
+    #touch { border-color: color-mix(in srgb, var(--accent) 50%, transparent); color: var(--accent); }
+    #hint { position: fixed; top: max(1rem, env(safe-area-inset-top)); left: 0; right: 0; text-align: center; z-index: 2;
+      font-size: 0.72rem; letter-spacing: 0.14em; color: var(--muted); pointer-events: none; }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="hint">glitch lab &middot; toggle to see each &middot; stack to layer</div>
+  <div id="panel">
+    <div class="top">
+      <label class="field">flower <select id="flower"></select></label>
+      <label class="field">intensity <input id="intensity" type="range" min="0" max="1" step="0.01" value="0.8" /></label>
+      <div class="btns">
+        <button id="touch">pulse touch</button>
+        <button id="none">all off</button>
+      </div>
+    </div>
+    <div id="fx"></div>
+  </div>
+  <script type="module" src="/src/glitch-lab.ts"></script>
+</body>
+</html>

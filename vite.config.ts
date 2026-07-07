@@ -7,6 +7,12 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
+    rollupOptions: {
+      input: {
+        main: './index.html',
+        glitchLab: './glitch-lab.html', // the glitch preview lab, deployed alongside the app
+      },
+    },
   },
   server: {
     https: true,

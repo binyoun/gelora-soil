@@ -13,6 +13,20 @@ const DEG = Math.PI / 180;
 const PORTRAIT_TINT_MIX = 0.32; // 0 = full species colour, 1 = untinted portrait (lower = more colour)
 const DNA_HUE_NUDGE = 0.12; // how far the capture's hue pulls the species tint (species stays dominant)
 
+/** Per-effect glitch strengths (0..1), independently toggleable and layerable. */
+export interface FlowerFx {
+  rgb: number; // RGB block corruption + dropout
+  wobble: number; // per-vertex wobble
+  mosh: number; // datamosh block-jump
+  bar: number; // rolling signal bar
+  posterize: number; // bit-crush
+  negative: number; // photographic negative
+  wireframe: number; // flicker to the bare triangle mesh
+  shatter: number; // petals burst outward
+  melt: number; // the bloom stretches and runs downward
+  flakes: number; // sheds photo-flakes
+}
+
 interface PetalParam {
   mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>;
   angle: number;
@@ -40,6 +54,10 @@ export class Flower {
   private stem: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial> | null = null;
   private mat: THREE.MeshStandardMaterial;
   private glitch: GlitchUniforms;
+  /** Per-effect glitch strengths. Driven from the touch surge when autoGlitch is
+      true (the real piece); set directly by the glitch lab when false. */
+  readonly fx: FlowerFx = { rgb: 0, wobble: 0, mosh: 0, bar: 0, posterize: 0, negative: 0, wireframe: 0, shatter: 0, melt: 0, flakes: 0 };
+  autoGlitch = true;
   private openBase: number;
   private closeExtra: number;
   private centerScaleFactor: number;
@@ -103,7 +121,7 @@ export class Flower {
       emissive: emissiveColor,
       emissiveIntensity: emissiveBase,
     });
-    this.glitch = patchGlitch(this.mat, tintColor.getHex(), 0.05);
+    this.glitch = patchGlitch(this.mat, tintColor.getHex());
 
     if (template.symmetry === 'bilateral') {
       if (template.id === 'jade') this.buildJadeVine(template, rand);
@@ -328,8 +346,25 @@ export class Flower {
     const lastTouchAge = growth.mutations.length ? growth.age - growth.mutations[growth.mutations.length - 1]!.at : 999;
     const touchSurge = Math.max(0, 1 - lastTouchAge / 2.2); // linger longer after a touch
     const base = 0.08 * smoothstep(0.25, 0.55, growth.maturity);
-    this.glitch.uGlitch.value = Math.min(1, base + touchSurge * 1.9);
+    if (this.autoGlitch) {
+      // the real piece maps the touch surge onto the classic three effects
+      const level = Math.min(1, base + touchSurge * 1.9);
+      this.fx.rgb = level * 0.7;
+      this.fx.wobble = level;
+      this.fx.mosh = level;
+    }
     this.glitch.uTime.value = time;
+    this.glitch.uRgb.value = this.fx.rgb;
+    this.glitch.uWob.value = this.fx.wobble;
+    this.glitch.uMosh.value = this.fx.mosh;
+    this.glitch.uBar.value = this.fx.bar;
+    this.glitch.uPost.value = this.fx.posterize;
+    this.glitch.uNeg.value = this.fx.negative;
+    // JS-side effects (safe): wireframe flicker and shedding photo-flakes
+    this.mat.wireframe = this.fx.wireframe > 0.01 && Math.random() < this.fx.wireframe * 0.6;
+    if (this.fx.flakes > 0.01 && present && Math.random() < this.fx.flakes * 0.5) {
+      this.spawnBurst(this.group.position, handScale);
+    }
 
     if (!present || growth.maturity <= 0.04) {
       this.group.visible = false;
@@ -363,14 +398,10 @@ export class Flower {
     // sharp swell at the start of the beat (phase 0) decaying across the beat,
     // plus a matching emissive lift for the luminous flowers. Only when a pulse
     // is present, so non-altar behaviour is untouched.
-    if (cardiacPhase !== null) {
-      const systole = Math.exp(-cardiacPhase * 5.0); // 1 at the beat, fading over it
-      this.group.scale.setScalar(1 + systole * 0.05 * unfold);
-      this.mat.emissiveIntensity = this.baseEmissive + systole * 0.28 * unfold;
-    } else {
-      this.group.scale.setScalar(1);
-      this.mat.emissiveIntensity = this.baseEmissive;
-    }
+    const systole = cardiacPhase !== null ? Math.exp(-cardiacPhase * 5.0) : 0; // 1 at the beat, fading over it
+    const throb = 1 + systole * 0.05 * unfold;
+    this.group.scale.set(throb, throb * (1 + this.fx.melt * 1.4), throb); // melt stretches the bloom downward
+    this.mat.emissiveIntensity = this.baseEmissive + systole * 0.28 * unfold;
 
     if (this.stem) {
       this.stem.scale.set(handScale, lift, handScale);
@@ -399,6 +430,11 @@ export class Flower {
         const swingX = Math.sin(time * 0.7 + p.swayPhase * 0.6) * amp * 0.8;
         const bob = Math.sin(time * 0.8 + p.swayPhase) * amp * 0.06;
         m.position.set(p.rest.pos.x * petalLen, p.rest.pos.y * petalLen + bob * petalLen, p.rest.pos.z * petalLen);
+        if (this.fx.shatter > 0.001) {
+          const s = this.fx.shatter * petalLen * 2.0;
+          m.position.x += p.rest.pos.x * s;
+          m.position.y += p.rest.pos.y * s;
+        }
         if (petal.detached) m.position.y -= petal.fallProgress * petalLen * 2.5;
         m.rotation.set(swingX, 0, p.rest.rotZ + swingZ);
       } else {
@@ -406,6 +442,12 @@ export class Flower {
         // shared breathing that opens and closes the whole bloom
         const tilt = this.closeExtra * DEG * (1 - unfold) + this.openBase * DEG + p.tiltBias + wilt * 40 * DEG + breathe * unfold;
         m.position.set(0, 0, p.z * petalLen);
+        if (this.fx.shatter > 0.001) {
+          const s = this.fx.shatter * petalLen * 1.3;
+          m.position.x += Math.cos(p.angle) * s;
+          m.position.y += Math.sin(p.angle) * s;
+          m.position.z += s * 0.3;
+        }
         if (petal.detached) m.position.y -= petal.fallProgress * petalLen * 2.5;
         m.rotation.set(0, 0, 0);
         m.rotateZ(p.angle + sway * 0.5);
