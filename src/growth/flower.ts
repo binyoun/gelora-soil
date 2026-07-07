@@ -82,7 +82,8 @@ export class Flower {
     this.glitch = patchGlitch(this.mat, tintColor.getHex(), 0.05);
 
     if (template.symmetry === 'bilateral') {
-      this.buildGhostOrchid(template, rand);
+      if (template.id === 'jade') this.buildJadeVine(template, rand);
+      else this.buildGhostOrchid(template, rand);
     } else {
       this.buildRadial(template, rand);
     }
@@ -220,6 +221,41 @@ export class Flower {
         swayPhase: rand() * Math.PI * 2,
         swayAmp: part.sway,
         rest: { pos: new THREE.Vector3(part.pos[0], part.pos[1], part.pos[2]), rotZ: part.rotZDeg * DEG },
+      });
+    }
+  }
+
+  private buildJadeVine(template: FlowerTemplate, rand: () => number): void {
+    const b = template.petal;
+    // A pendant cluster: a few upright "standard" petals at the crown, and a
+    // cascade of long hooked claws hanging and drifting like the raceme in air.
+    const crown = 3;
+    for (let i = 0; i < crown; i++) {
+      const shape: PetalShape = { ...b, width: 0.12, sharp: 1.3, cup: 0.5, curl: 0.3, strap: 0.1 };
+      const geo = buildPetalGeometry(shape, 90 * DEG, 60 * DEG, 0.4, rand);
+      const mesh = new THREE.Mesh(geo, this.mat);
+      mesh.frustumCulled = false;
+      this.group.add(mesh);
+      this.petals.push({
+        mesh, angle: 90 * DEG, scale: 0.72, tiltBias: 0, z: 0.05,
+        swayPhase: rand() * Math.PI * 2, swayAmp: 0.08,
+        rest: { pos: new THREE.Vector3((i - 1) * 0.045, 0.12, 0.05), rotZ: (i - 1) * 24 * DEG },
+      });
+    }
+    const claws = 7;
+    for (let i = 0; i < claws; i++) {
+      const f = i / (claws - 1); // 0 at the top of the cascade, 1 at the tip
+      const side = i % 2 === 0 ? 1 : -1;
+      const shape: PetalShape = { ...b, width: 0.045, sharp: 1.0, strap: 0.82, curl: 0.12, cup: 0.16, bend: side * (0.42 + rand() * 0.18) };
+      const geo = buildPetalGeometry(shape, 90 * DEG, 60 * DEG, 0.42, rand);
+      const mesh = new THREE.Mesh(geo, this.mat);
+      mesh.frustumCulled = false;
+      this.group.add(mesh);
+      this.petals.push({
+        mesh, angle: 90 * DEG, scale: 1.7 - f * 0.5, tiltBias: 0, z: 0.02 + f * 0.01,
+        swayPhase: rand() * Math.PI * 2, swayAmp: 0.14 + f * 0.12,
+        // hang downward (rotZ near 180deg), fanning out to the sides as they descend
+        rest: { pos: new THREE.Vector3(side * (0.05 + f * 0.06), 0.08 - f * 0.42, 0.02), rotZ: (180 + side * (12 + f * 22)) * DEG },
       });
     }
   }

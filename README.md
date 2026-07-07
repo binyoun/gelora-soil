@@ -14,7 +14,7 @@ A contemporary vanitas. Where the Dutch still-life set beauty beside a skull, th
 
 The interaction grammar is care, stillness, and duration: the flower takes root only while the hand is offered and still, and it is never saved. Vanity, beauty, and transience become the same gesture.
 
-### The seven flowers
+### The eight flowers
 
 Each is extinct, endangered, or ephemeral. You wear whichever you choose.
 
@@ -25,6 +25,7 @@ Each is extinct, endangered, or ephemeral. You wear whichever you choose.
 - **Franklinia**. A tree found once beside a river in Georgia, extinct in the wild since 1803; every specimen alive was grown from a cutting.
 - **Koki'o** (Kokia cookei). A Hawaiian tree once reduced to a single plant, kept alive only by grafting it onto its relatives.
 - **Rafflesia**. The corpse flower, the largest bloom on earth; it opens for a few days, smells of the dead, and rots. Endangered as its forests fall.
+- **Jade vine** (Strongylodon macrobotrys). Endangered; its unreal turquoise claw-shaped flowers hang in long cascades and glow in the forest dark for the bats that pollinate them. The one bilateral bloom besides the ghost orchid.
 
 ---
 
@@ -73,8 +74,8 @@ The camera feed is a plain fullscreen DOM `<video>` (`object-fit: cover`), and t
 
 The being is a DNA-driven 3D model that wears the captured selfie, built from a `FlowerTemplate`:
 
-- `src/growth/flowerTemplates.ts` defines the four flowers as data: layered petal arrangement, a `PetalShape` (width, tip sharpness, curl, cup, edge ruffle, strap vs taper, sideways `bend`, center `bulge`), open/closed tilt range, center style, stem, material feel, glow tint, and the vanitas story.
-- `src/growth/flower.ts` builds from a template. Radial flowers (tulip, chrysanthemum, kadupul) assemble many petals in concentric layers; each petal is its own mesh whose UVs sample a radial wedge of the selfie, so the assembled bloom reconstructs the portrait in 3D. The ghost orchid is bilateral: slender upper sepals, a voluminous cupped lip, a little central rosette, and two long curling tails, each part with its own floating drift.
+- `src/growth/flowerTemplates.ts` defines the eight flowers as data: layered petal arrangement, a `PetalShape` (width, tip sharpness, curl, cup, edge ruffle, strap vs taper, sideways `bend`, center `bulge`), open/closed tilt range, center style, stem, material feel, glow tint, and the vanitas story.
+- `src/growth/flower.ts` builds from a template. Radial flowers (tulip, chrysanthemum, kadupul, franklinia, koki'o, rafflesia) assemble many petals in concentric layers; each petal is its own mesh whose UVs sample a radial wedge of the selfie, so the assembled bloom reconstructs the portrait in 3D. Two flowers are bilateral with their own build paths: the ghost orchid (slender upper sepals, a voluminous cupped lip, a little central rosette, two long curling tails) and the jade vine (an upright crown over a cascade of long hooked claws), each part with its own floating drift.
 - The same growth state drives every flower: petals open with maturity, droop with wilt, shed on pour, and glitch on touch. `FlowerDNA` still varies color, size, and jitter within the chosen structure.
 
 ### Glitch and residue

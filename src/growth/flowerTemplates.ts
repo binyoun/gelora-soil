@@ -216,6 +216,24 @@ export const TEMPLATES: FlowerTemplate[] = [
     swayAmp: 0.04,
     breatheAmp: 0,
   },
+  {
+    id: 'jade',
+    name: 'jade vine',
+    story: 'endangered, its unreal turquoise claws hang in the forest dark and glow for the bats that feed them.',
+    symmetry: 'bilateral', // a pendant cluster of hooked, luminous claws (see buildJadeVine)
+    layers: [],
+    petal: { width: 0.05, sharp: 1.0, curl: 0.12, cup: 0.16, waveAmp: 0.03, waveFreq: 5, strap: 0.8 },
+    openBaseDeg: 0,
+    closeExtraDeg: 0,
+    center: 'none',
+    centerScale: 0,
+    centerColor: 0,
+    stem: false,
+    roughness: 0.4,
+    emissive: 0x0c3a34,
+    emissiveIntensity: 0.5,
+    glowTint: 0x66f0d0,
+  },
 ];
 
 export function templateById(id: string): FlowerTemplate {

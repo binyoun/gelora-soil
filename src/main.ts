@@ -279,6 +279,7 @@ function tagFor(id: string): string {
     case 'franklinia': return 'lost from the wild';
     case 'kokio': return 'critically rare';
     case 'rafflesia': return 'ephemeral';
+    case 'jade': return 'endangered';
     default: return '';
   }
 }
