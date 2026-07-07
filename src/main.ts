@@ -137,8 +137,10 @@ async function begin(): Promise<void> {
     }
     const jobs: Promise<unknown>[] = [];
     if (!segmenterReady) jobs.push(initSegmenter().then(() => { segmenterReady = true; }));
+    // Both modes use the hand landmarker: palm mode to root the flower, mouth mode
+    // for the mediated-touch glitch (a hand brought to the bloom erupts it).
+    if (!handReady) jobs.push(initHandLandmarker().then(() => { handReady = true; }));
     if (growMode === 'mouth' && !faceReady) jobs.push(initFaceLandmarker().then(() => { faceReady = true; }));
-    if (growMode === 'palm' && !handReady) jobs.push(initHandLandmarker().then(() => { handReady = true; }));
     await Promise.all(jobs);
   } catch (err) {
     console.error(err);
@@ -501,6 +503,13 @@ function loop(nowMs: number): void {
     if (faceLm) stability = stabilityTracker.update(mouthCenter(faceLm), nowMs);
     else stabilityTracker.reset();
     hand = buildMouthHandState(faceLm, stability);
+    // Track a hand too, so bringing it to the bloom erupts glitch (mediated touch).
+    const hres = videoReady ? detectHands(videoEl, nowMs) : null;
+    const touchHand = hres?.landmarks?.[0] ?? null;
+    if (touchHand && faceLm) {
+      const tip = touchHand[8]!;
+      hand.secondHandTip = { x: tip.x, y: tip.y, z: tip.z };
+    }
   } else {
     const result = videoReady ? detectHands(videoEl, nowMs) : null;
     primaryRaw = result?.landmarks?.[0] ?? null;

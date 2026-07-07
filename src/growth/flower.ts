@@ -10,7 +10,7 @@ const MAX_PARTICLES = 440;
 const PARTICLE_LIFETIME_S = 5.0; // long enough to trail down to the bottom
 const FLAKE_UV_PATCH = 0.16; // each residue flake samples this fraction of the photo
 const DEG = Math.PI / 180;
-const PORTRAIT_TINT_MIX = 0.5; // 0 = full species colour, 1 = untinted portrait (portrait-forward)
+const PORTRAIT_TINT_MIX = 0.32; // 0 = full species colour, 1 = untinted portrait (lower = more colour)
 const DNA_HUE_NUDGE = 0.12; // how far the capture's hue pulls the species tint (species stays dominant)
 
 interface PetalParam {
@@ -67,16 +67,28 @@ export class Flower {
     // over the selfie (multiplied), so the portrait stays a colour photo and the
     // species reads as an accent. The participant's dominant hue nudges it a
     // little so no two blooms are identical, with the species still dominant.
-    const petalTint = new THREE.Color(template.petalColor).lerp(new THREE.Color(0xffffff), PORTRAIT_TINT_MIX);
+    const tintMix = template.tintMix ?? PORTRAIT_TINT_MIX;
+    const petalTint = new THREE.Color(template.petalColor).lerp(new THREE.Color(0xffffff), tintMix);
     const tintHSL = { h: 0, s: 0, l: 0 };
     petalTint.getHSL(tintHSL);
     petalTint.setHSL((tintHSL.h + (dna.hueCenter / 360 - tintHSL.h) * DNA_HUE_NUDGE + 1) % 1, tintHSL.s, tintHSL.l);
+    // Saturated, non-luminous species self-glow faintly in their own colour, so
+    // the colour reads even where the multiply tint is dark, without losing the
+    // portrait. The luminous flowers (kadupul, jade, ghost) keep their own glow.
+    const speciesHSL = { h: 0, s: 0, l: 0 };
+    new THREE.Color(template.petalColor).getHSL(speciesHSL);
+    let emissiveColor = new THREE.Color(template.emissive);
+    let emissiveBase = template.emissiveIntensity;
+    if (emissiveBase === 0 && speciesHSL.s > 0.25) {
+      emissiveColor = new THREE.Color(template.petalColor).multiplyScalar(0.6);
+      emissiveBase = 0.16;
+    }
     this.openBase = template.openBaseDeg;
     this.closeExtra = template.closeExtraDeg;
     this.centerScaleFactor = template.centerScale;
     this.swayAmp = template.swayAmp ?? 0.06;
     this.breatheAmp = template.breatheAmp ?? 0;
-    this.baseEmissive = template.emissiveIntensity;
+    this.baseEmissive = emissiveBase;
 
     this.mat = new THREE.MeshStandardMaterial({
       map: photo,
@@ -84,10 +96,12 @@ export class Flower {
       roughness: template.roughness,
       metalness: 0.0,
       side: THREE.DoubleSide,
-      envMapIntensity: 0.85,
+      // dark species catch less of the bright room environment, so their colour
+      // is not washed out to pale by reflected light
+      envMapIntensity: 0.85 * (0.55 + 0.45 * speciesHSL.l),
       alphaTest: 0.35,
-      emissive: new THREE.Color(template.emissive),
-      emissiveIntensity: template.emissiveIntensity,
+      emissive: emissiveColor,
+      emissiveIntensity: emissiveBase,
     });
     this.glitch = patchGlitch(this.mat, tintColor.getHex(), 0.05);
 
@@ -312,9 +326,9 @@ export class Flower {
     cardiacPhase: number | null = null,
   ): void {
     const lastTouchAge = growth.mutations.length ? growth.age - growth.mutations[growth.mutations.length - 1]!.at : 999;
-    const touchSurge = Math.max(0, 1 - lastTouchAge / 1.6);
+    const touchSurge = Math.max(0, 1 - lastTouchAge / 2.2); // linger longer after a touch
     const base = 0.08 * smoothstep(0.25, 0.55, growth.maturity);
-    this.glitch.uGlitch.value = Math.min(1, base + touchSurge * 1.5);
+    this.glitch.uGlitch.value = Math.min(1, base + touchSurge * 1.9);
     this.glitch.uTime.value = time;
 
     if (!present || growth.maturity <= 0.04) {

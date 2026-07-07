@@ -41,7 +41,8 @@ export interface FlowerTemplate {
   centerScale: number;
   centerColor: number;
   stem: boolean;
-  petalColor: number; // the species' own colour, washed gently over the selfie (portrait stays dominant)
+  petalColor: number; // the species' own colour, washed over the selfie (portrait stays visible)
+  tintMix?: number; // override the global tint strength for this flower (lower = more colour)
   roughness: number;
   emissive: number;
   emissiveIntensity: number;
@@ -180,6 +181,7 @@ export const TEMPLATES: FlowerTemplate[] = [
     name: "koki'o",
     story: 'a Hawaiian tree once down to a single plant, kept alive only by grafting it onto its cousins.',
     petalColor: 0xb42a17,
+    tintMix: 0.24,
     symmetry: 'radial',
     // a hibiscus-like whorl of narrow, upturned petals around a long stamen column
     layers: [
@@ -205,6 +207,7 @@ export const TEMPLATES: FlowerTemplate[] = [
     name: 'rafflesia',
     story: 'the corpse flower, the largest bloom on earth; it opens for a few days, reeks of the dead, then rots.',
     petalColor: 0x9e3a22,
+    tintMix: 0.22,
     symmetry: 'radial',
     // five huge, thick, leathery lobes around a dark spiked central disc
     layers: [
@@ -248,6 +251,7 @@ export const TEMPLATES: FlowerTemplate[] = [
     name: 'chocolate cosmos',
     story: 'extinct in the wild, every plant a clone of one; it smells of chocolate and never sets seed.',
     petalColor: 0x3f1418,
+    tintMix: 0.1,
     symmetry: 'radial',
     // a flat, open daisy: one ring of broad, faintly notched rays around a dark,
     // velvety central disc

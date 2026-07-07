@@ -30,7 +30,7 @@ const POUR_FALL_DURATION_S = 2.5;
 const POUR_RECOVER_LIMIT = 0.6; // petals past this fall fraction are gone; before it, they recover
 const POUR_RECOVER_TIME_S = 1.5;
 
-const TOUCH_RADIUS = 0.2; // normalized landmark-space units (a hand gesture near the being glitches it)
+const TOUCH_RADIUS = 0.26; // normalized landmark-space units (a hand gesture near the being glitches it)
 const TOUCH_COOLDOWN_S = 0.2; // fire often so an interacting hand keeps the glitch alive
 const PETAL_ORBIT_RADIUS = 0.12;
 const PETAL_ORBIT_SPEED = 0.15; // rad/s
