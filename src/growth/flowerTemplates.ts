@@ -234,6 +234,56 @@ export const TEMPLATES: FlowerTemplate[] = [
     emissiveIntensity: 0.5,
     glowTint: 0x66f0d0,
   },
+  {
+    id: 'cosmos',
+    name: 'chocolate cosmos',
+    story: 'extinct in the wild, every plant a clone of one; it smells of chocolate and never sets seed.',
+    symmetry: 'radial',
+    // a flat, open daisy: one ring of broad, faintly notched rays around a dark,
+    // velvety central disc
+    layers: [
+      { count: 8, rMax: 0.5, scale: 1.1, tiltBias: 6 * DEG, z: 0.0 },
+      { count: 8, rMax: 0.44, scale: 0.96, tiltBias: 12 * DEG, z: 0.03 },
+    ],
+    petal: { width: 0.3, sharp: 0.55, curl: 0.05, cup: 0.12, waveAmp: 0.05, waveFreq: 3, strap: 0.2 },
+    openBaseDeg: 16,
+    closeExtraDeg: 44,
+    center: 'tuft',
+    centerScale: 0.5,
+    centerColor: 0x2a0d0d,
+    stem: true,
+    roughness: 0.62,
+    emissive: 0x000000,
+    emissiveIntensity: 0,
+    glowTint: 0x5a2020,
+  },
+  {
+    id: 'middlemist',
+    name: "middlemist's red",
+    story: 'the rarest flower on earth: two plants are known to exist, one behind glass, one in a garden.',
+    symmetry: 'radial',
+    // a full formal camellia rosette: many rounded petals in tight rings, opening
+    // to a flat face (distinct from the chrysanthemum's tight incurved ball)
+    layers: [
+      { count: 10, rMax: 0.46, scale: 1.0, tiltBias: 12 * DEG, z: 0.0 },
+      { count: 10, rMax: 0.38, scale: 0.86, tiltBias: 22 * DEG, z: 0.04 },
+      { count: 9, rMax: 0.3, scale: 0.72, tiltBias: 32 * DEG, z: 0.08 },
+      { count: 7, rMax: 0.22, scale: 0.58, tiltBias: 42 * DEG, z: 0.11 },
+      { count: 5, rMax: 0.13, scale: 0.44, tiltBias: 52 * DEG, z: 0.14 },
+    ],
+    petal: { width: 0.24, sharp: 0.5, curl: 0.16, cup: 0.34, waveAmp: 0.03, waveFreq: 6, strap: 0 },
+    openBaseDeg: 30,
+    closeExtraDeg: 30,
+    center: 'none',
+    centerScale: 0,
+    centerColor: 0,
+    stem: true,
+    roughness: 0.48,
+    emissive: 0x000000,
+    emissiveIntensity: 0,
+    glowTint: 0xffd0dd,
+    breatheAmp: 0.04,
+  },
 ];
 
 export function templateById(id: string): FlowerTemplate {

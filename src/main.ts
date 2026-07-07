@@ -280,6 +280,8 @@ function tagFor(id: string): string {
     case 'kokio': return 'critically rare';
     case 'rafflesia': return 'ephemeral';
     case 'jade': return 'endangered';
+    case 'cosmos': return 'a single clone';
+    case 'middlemist': return 'two plants left';
     default: return '';
   }
 }
