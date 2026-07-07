@@ -5,6 +5,8 @@ import { initSegmenter, segmentFrame } from './capture/segment';
 import { buildHandState } from './hand/gestures';
 import { initHandLandmarker, detectHands } from './hand/landmarker';
 import { PalmStabilityTracker, type RawLandmark } from './hand/palm';
+import { initFaceLandmarker, detectFace } from './face/landmarker';
+import { buildMouthHandState, mouthCenter } from './face/mouth';
 import { GrowthEngine } from './growth/engine';
 import { FlowerHeart } from './growth/flowerHeart';
 import { PulseSensor } from './sensors/pulse';
@@ -15,7 +17,7 @@ import { Roots } from './growth/roots';
 import { ARScene } from './render/scene';
 import { landmarkSpan, landmarkToScreen, landmarkToWorld } from './render/anchor';
 import { StageMachine } from './stages';
-import type { FlowerDNA, HandState } from './types';
+import type { FlowerDNA, HandState, Stage } from './types';
 import { DebugOverlay, FpsMonitor, isDebugEnabled } from './ui/debug';
 import { PromptUI, promptForStage } from './ui/prompts';
 
@@ -36,6 +38,7 @@ const stageCaptureSection = document.getElementById('stage-capture')!;
 const cameraToggleButton = document.getElementById('camera-toggle') as HTMLButtonElement;
 const shutterFallbackButton = document.getElementById('shutter-fallback') as HTMLButtonElement;
 const promptEl = document.getElementById('prompt')!;
+const growToggleEl = document.getElementById('grow-toggle')!;
 const pulseConnectButton = document.getElementById('pulse-connect') as HTMLButtonElement;
 const pulseReadEl = document.getElementById('pulse-read')!;
 const captureRing = document.getElementById('capture-ring') as unknown as SVGSVGElement;
@@ -102,7 +105,11 @@ let prevStage = stageMachine.stage;
 let lastFrameMs = performance.now();
 
 let mode: 'landing' | 'ar' = 'landing';
+let growMode: 'palm' | 'mouth' = 'palm'; // landing choice: grow from the hand, or from the open mouth
 let cameraReady = false;
+let handReady = false;
+let faceReady = false;
+let segmenterReady = false;
 let starting = false;
 let switchingCamera = false; // altar: guards the face<->hand camera swap
 let flowerIndex = 0;
@@ -119,26 +126,29 @@ async function begin(): Promise<void> {
   starting = true;
   // This tap is the user gesture Web Audio needs; start the altar sound here.
   if (ALTAR_MODE) altarSound.resume().catch((err) => console.error(err));
-  if (!cameraReady) {
-    landingEl.classList.add('loading');
-    try {
-      // Front camera: the visitor's portrait becomes the flower. Altar mode also
-      // captures the face on the front camera first, then switches to the fixed
-      // hand camera after capture (see runCapturePipeline), so the petals still
-      // wear a portrait rather than a picture of the hand.
+  landingEl.classList.add('loading');
+  try {
+    // Front camera: the visitor's portrait becomes the flower. Only the tracker
+    // for the chosen grow mode is loaded (hand landmarker, or face landmarker for
+    // the mouth), each once. The segmenter mattes the selfie for both modes.
+    if (!cameraReady) {
       await camera.start('user');
-      await Promise.all([initHandLandmarker(), initSegmenter()]);
-    } catch (err) {
-      console.error(err);
-      landingEl.classList.remove('loading');
-      starting = false;
-      flowerNameEl.textContent = 'camera access denied';
-      return;
+      cameraReady = true;
     }
-    cameraReady = true;
-    applyVideoMetrics();
+    const jobs: Promise<unknown>[] = [];
+    if (!segmenterReady) jobs.push(initSegmenter().then(() => { segmenterReady = true; }));
+    if (growMode === 'mouth' && !faceReady) jobs.push(initFaceLandmarker().then(() => { faceReady = true; }));
+    if (growMode === 'palm' && !handReady) jobs.push(initHandLandmarker().then(() => { handReady = true; }));
+    await Promise.all(jobs);
+  } catch (err) {
+    console.error(err);
     landingEl.classList.remove('loading');
+    starting = false;
+    flowerNameEl.textContent = 'camera access denied';
+    return;
   }
+  applyVideoMetrics();
+  landingEl.classList.remove('loading');
   starting = false;
   enterAR();
 }
@@ -222,6 +232,21 @@ function changeFlower(delta: number): void {
 chevLeftBtn.addEventListener('click', (e) => { e.stopPropagation(); changeFlower(-1); });
 chevRightBtn.addEventListener('click', (e) => { e.stopPropagation(); changeFlower(1); });
 
+// Landing: choose to grow from the palm or from the open mouth.
+function setGrowMode(m: 'palm' | 'mouth'): void {
+  growMode = m;
+  growToggleEl.querySelectorAll('button').forEach((b) => {
+    b.classList.toggle('on', (b as HTMLElement).dataset.mode === m);
+  });
+}
+growToggleEl.querySelectorAll('button').forEach((btn) => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const m = (btn as HTMLElement).dataset.mode as 'palm' | 'mouth' | undefined;
+    if (m) setGrowMode(m);
+  });
+});
+
 let touchStartX = 0;
 let touchStartY = 0;
 let touchStartT = 0;
@@ -239,7 +264,7 @@ window.addEventListener('pointerup', (e) => {
   if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) {
     changeFlower(dx < 0 ? 1 : -1); // swipe left -> next
   } else if (Math.abs(dx) < 12 && Math.abs(dy) < 12 && dt < 500) {
-    if (!(e.target as HTMLElement).closest('.chev')) begin().catch((err) => console.error(err));
+    if (!(e.target as HTMLElement).closest('.chev, #grow-toggle')) begin().catch((err) => console.error(err));
   }
 });
 
@@ -432,6 +457,13 @@ function updateRings(stage: string, primaryRaw: RawLandmark[] | null, nowMs: num
   }
 }
 
+/** Prompts for the grow-from-the-mouth mode (SOWING/GROWING); other stages fall back. */
+function mouthPromptFor(stage: Stage, present: boolean, openness: number): string {
+  if (stage === 'SOWING') return present ? 'open your mouth, stay still' : 'bring your face to the camera';
+  if (stage === 'GROWING') return openness < 0.35 ? 'open your mouth' : '';
+  return promptForStage(stage, { handPresent: present, capturing: false });
+}
+
 function consumeManualTrigger(): boolean {
   if (manualShutterTrigger) {
     manualShutterTrigger = false;
@@ -456,19 +488,32 @@ function loop(nowMs: number): void {
     return;
   }
 
-  const result = videoEl.readyState >= 2 ? detectHands(videoEl, nowMs) : null;
-  const primaryRaw: RawLandmark[] | null = result?.landmarks?.[0] ?? null;
-  const secondaryRaw: RawLandmark[] | null = result?.landmarks?.[1] ?? null;
+  const videoReady = videoEl.readyState >= 2;
+  let primaryRaw: RawLandmark[] | null = null; // hand landmarks (palm mode)
+  let secondaryRaw: RawLandmark[] | null = null; // second hand (palm mode: touch glitch)
+  let faceLm: RawLandmark[] | null = null; // face mesh (mouth mode)
+  let hand: HandState;
 
-  let stability = 0;
-  if (primaryRaw) {
-    const wristKnuckle = primaryRaw[9]!;
-    stability = stabilityTracker.update({ x: wristKnuckle.x, y: wristKnuckle.y, z: wristKnuckle.z }, nowMs);
+  if (growMode === 'mouth') {
+    const fr = videoReady ? detectFace(videoEl, nowMs) : null;
+    faceLm = fr?.faceLandmarks?.[0] ?? null;
+    let stability = 0;
+    if (faceLm) stability = stabilityTracker.update(mouthCenter(faceLm), nowMs);
+    else stabilityTracker.reset();
+    hand = buildMouthHandState(faceLm, stability);
   } else {
-    stabilityTracker.reset();
+    const result = videoReady ? detectHands(videoEl, nowMs) : null;
+    primaryRaw = result?.landmarks?.[0] ?? null;
+    secondaryRaw = result?.landmarks?.[1] ?? null;
+    let stability = 0;
+    if (primaryRaw) {
+      const wristKnuckle = primaryRaw[9]!;
+      stability = stabilityTracker.update({ x: wristKnuckle.x, y: wristKnuckle.y, z: wristKnuckle.z }, nowMs);
+    } else {
+      stabilityTracker.reset();
+    }
+    hand = buildHandState(primaryRaw, secondaryRaw, stability);
   }
-
-  const hand = buildHandState(primaryRaw, secondaryRaw, stability);
   const mirror = camera.currentFacing === 'user';
 
   if (stageMachine.stage === 'CAPTURE' && !capturing) {
@@ -511,13 +556,22 @@ function loop(nowMs: number): void {
     pouredOut = growthEngine.pouredOut;
 
     const ctx = arScene.anchorContext();
-    if (primaryRaw) {
+    if (growMode === 'mouth') {
+      if (faceLm) {
+        landmarkToWorld(mouthCenter(faceLm), ctx, originWorld);
+        handScale = Math.max(0.05, landmarkSpan(faceLm[33]!, faceLm[263]!, ctx) * 0.85);
+      }
+    } else if (primaryRaw) {
       landmarkToWorld(primaryRaw[9]!, ctx, originWorld);
       handScale = Math.max(0.03, landmarkSpan(primaryRaw[0]!, primaryRaw[9]!, ctx));
     }
 
     const t = nowMs / 1000;
-    roots?.update(primaryRaw, ctx, maturity);
+    // Finger-vein roots are a palm thing; hide them when growing from the mouth.
+    if (roots) {
+      roots.group.visible = growMode === 'palm';
+      if (growMode === 'palm') roots.update(primaryRaw, ctx, maturity);
+    }
     if (currentDna) flower?.update(currentDna, state, originWorld, handScale, hand.present, t, dtSeconds, cardiacIn ? cardiac.phase : null);
     altarSound.update(state, cardiacIn, hand.present, dtSeconds);
 
@@ -572,6 +626,8 @@ function loop(nowMs: number): void {
     // "get closer" first, then a 2..1 countdown before the selfie fires
     const remaining = AUTO_CAPTURE_SECONDS - (nowMs - captureCountdownStartMs) / 1000;
     promptUI.set(remaining > 2 ? 'get closer' : String(Math.max(1, Math.ceil(remaining))));
+  } else if (growMode === 'mouth') {
+    promptUI.set(mouthPromptFor(stage, hand.present, hand.openness));
   } else {
     promptUI.set(promptForStage(stage, { handPresent: hand.present, capturing }));
   }

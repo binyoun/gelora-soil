@@ -33,9 +33,9 @@ Each is extinct, endangered, or ephemeral. You wear whichever you choose.
 
 ## How it works
 
-1. **Landing.** A 3D preview of the chosen flower rotates gently over a dark ground. Swipe left or right (or tap the side chevrons) to change flower. Tap anywhere to become the current one.
+1. **Landing.** A 3D preview of the chosen flower rotates gently over a dark ground, tinted with the flower's own colour. Swipe left or right (or tap the side chevrons) to change flower, and choose to grow it from the palm or from the open mouth. Tap anywhere to become the current one.
 2. **Capture.** A 3-second self-timer photographs you with the front camera (tap to capture immediately). The portrait is segmented from the background on-device.
-3. **Sow.** Offer an open, still palm to the camera. Stillness is care: the steadier the hand, the faster the flower takes root.
+3. **Sow.** Offer an open, still palm to the camera (or, in mouth mode, bring your face close and hold still). Stillness is care: the steadier you are, the faster the flower takes root.
 4. **Grow.** Your chosen flower grows from your palm wearing your own portrait, seeded by the capture so no two are the same. It keeps mutating for as long as you hold it.
 5. **Tend.** Close your hand to wilt it; reopen to recover. Tilt your palm past horizontal to let it pour away as glowing water-blue motes (tilt back before it is mostly gone and it recovers).
 6. **Touch.** Bring a second hand near the bloom to erupt it into glitch: a mediated touch.
@@ -48,7 +48,7 @@ Nothing is stored. No accounts, no gallery, no analytics. Camera frames never le
 ## Stack
 
 - **Three.js** (rendering, custom geometry, PBR + PMREM environment, custom shaders)
-- **MediaPipe Tasks Vision**: `HandLandmarker` (2 hands, VIDEO mode) and `ImageSegmenter` (selfie segmentation), models and wasm runtime self-hosted under `public/`
+- **MediaPipe Tasks Vision**: `HandLandmarker` (2 hands, VIDEO mode), `FaceLandmarker` (1 face, for the grow-from-the-mouth mode), and `ImageSegmenter` (selfie segmentation), models and wasm runtime self-hosted under `public/`
 - **Vite + TypeScript** (strict)
 - **No backend.** State is in-memory only. Deployed as static files to GitHub Pages via GitHub Actions.
 
