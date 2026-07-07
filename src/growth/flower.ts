@@ -19,12 +19,18 @@ export interface FlowerFx {
   wobble: number; // per-vertex wobble
   mosh: number; // datamosh block-jump
   bar: number; // rolling signal bar
+  slice: number; // horizontal slice displacement
+  spike: number; // sharp corruption spikes
   posterize: number; // bit-crush
   negative: number; // photographic negative
+  scanlines: number; // CRT scanlines
+  chroma: number; // channel-cycle chroma corruption
   wireframe: number; // flicker to the bare triangle mesh
   shatter: number; // petals burst outward
   melt: number; // the bloom stretches and runs downward
   flakes: number; // sheds photo-flakes
+  strobe: number; // petals flicker in and out
+  judder: number; // the whole bloom jerks in steps
 }
 
 interface PetalParam {
@@ -56,7 +62,7 @@ export class Flower {
   private glitch: GlitchUniforms;
   /** Per-effect glitch strengths. Driven from the touch surge when autoGlitch is
       true (the real piece); set directly by the glitch lab when false. */
-  readonly fx: FlowerFx = { rgb: 0, wobble: 0, mosh: 0, bar: 0, posterize: 0, negative: 0, wireframe: 0, shatter: 0, melt: 0, flakes: 0 };
+  readonly fx: FlowerFx = { rgb: 0, wobble: 0, mosh: 0, bar: 0, slice: 0, spike: 0, posterize: 0, negative: 0, scanlines: 0, chroma: 0, wireframe: 0, shatter: 0, melt: 0, flakes: 0, strobe: 0, judder: 0 };
   autoGlitch = true;
   private openBase: number;
   private closeExtra: number;
@@ -358,8 +364,12 @@ export class Flower {
     this.glitch.uWob.value = this.fx.wobble;
     this.glitch.uMosh.value = this.fx.mosh;
     this.glitch.uBar.value = this.fx.bar;
+    this.glitch.uSlice.value = this.fx.slice;
+    this.glitch.uSpike.value = this.fx.spike;
     this.glitch.uPost.value = this.fx.posterize;
     this.glitch.uNeg.value = this.fx.negative;
+    this.glitch.uScan.value = this.fx.scanlines;
+    this.glitch.uChroma.value = this.fx.chroma;
     // JS-side effects (safe): wireframe flicker and shedding photo-flakes
     this.mat.wireframe = this.fx.wireframe > 0.01 && Math.random() < this.fx.wireframe * 0.6;
     if (this.fx.flakes > 0.01 && present && Math.random() < this.fx.flakes * 0.5) {
@@ -385,6 +395,11 @@ export class Flower {
       originWorld.y + lift + (Math.random() - 0.5) * jitterAmp,
       originWorld.z,
     );
+    if (this.fx.judder > 0.01) {
+      const j = this.fx.judder * handScale * 0.6;
+      this.group.position.x += (Math.random() - 0.5) * j;
+      this.group.position.y += (Math.random() - 0.5) * j;
+    }
     // gentle head nod, amplified for flowers that "breathe" (the tulip)
     const nod = this.breatheAmp;
     this.group.rotation.set(
@@ -454,7 +469,7 @@ export class Flower {
         m.rotateX(tilt + sway);
       }
       m.scale.setScalar(scale);
-      m.visible = scale > 1e-4;
+      m.visible = scale > 1e-4 && !(this.fx.strobe > 0.01 && Math.random() < this.fx.strobe * 0.45);
 
       if (petal.detached && !this.wasDetached[i]) this.spawnBurst(this.group.position, handScale);
       this.wasDetached[i] = petal.detached;

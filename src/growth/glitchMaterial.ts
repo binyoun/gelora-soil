@@ -16,8 +16,12 @@ export interface GlitchUniforms {
   uWob: { value: number }; // per-vertex wobble (vertex)
   uMosh: { value: number }; // datamosh block-jump (vertex)
   uBar: { value: number }; // rolling signal bar (vertex)
+  uSlice: { value: number }; // multiple horizontal slice displacement (vertex)
+  uSpike: { value: number }; // sharp corruption spikes (vertex)
   uPost: { value: number }; // posterize / bit-crush (fragment)
   uNeg: { value: number }; // negative strobe (fragment)
+  uScan: { value: number }; // scanlines (fragment)
+  uChroma: { value: number }; // channel-cycle chroma corruption (fragment)
 }
 
 const VERT_HEADER = `
@@ -25,6 +29,8 @@ varying vec2 vGlitchUv;
 uniform float uWob;
 uniform float uMosh;
 uniform float uBar;
+uniform float uSlice;
+uniform float uSpike;
 uniform float uTime;
 float glitchHash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 `;
@@ -51,6 +57,14 @@ vGlitchUv = uv;
   float bar = smoothstep(0.05, 0.0, d) * uBar;
   transformed.x += (glitchHash(gb + gt + 13.0) - 0.5) * bar * 0.28;
   transformed.z += (glitchHash(gb + gt + 19.0) - 0.5) * bar * 0.16;
+  // slice displacement: many horizontal bands jump sideways
+  float sy = floor(wp.y * 12.0);
+  float st = floor(uTime * 8.0);
+  float sjit = step(0.6, glitchHash(vec2(sy, st)));
+  transformed.x += (glitchHash(vec2(sy, st + 5.0)) - 0.5) * sjit * uSlice * 0.3;
+  // sharp corruption spikes on scattered vertices
+  float sp = step(0.85, glitchHash(floor(position.xy * 30.0) + floor(uTime * 10.0)));
+  transformed += normal * sp * uSpike * 0.4;
 }
 `;
 
@@ -59,6 +73,8 @@ varying vec2 vGlitchUv;
 uniform float uRgb;
 uniform float uPost;
 uniform float uNeg;
+uniform float uScan;
+uniform float uChroma;
 uniform float uTime;
 uniform vec3 uTint;
 float glitchHash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
@@ -80,6 +96,8 @@ if (uRgb > 0.001) {
 }
 gl_FragColor.rgb = mix(gl_FragColor.rgb, floor(gl_FragColor.rgb * 4.0) / 4.0, uPost);
 gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(1.0) - gl_FragColor.rgb, uNeg);
+gl_FragColor.rgb *= 1.0 - uScan * 0.55 * step(0.5, fract(vGlitchUv.y * 90.0));
+gl_FragColor.rgb = mix(gl_FragColor.rgb, gl_FragColor.gbr, uChroma);
 `;
 
 export function patchGlitch(material: THREE.Material, tintHex: number): GlitchUniforms {
@@ -90,8 +108,12 @@ export function patchGlitch(material: THREE.Material, tintHex: number): GlitchUn
     uWob: { value: 0 },
     uMosh: { value: 0 },
     uBar: { value: 0 },
+    uSlice: { value: 0 },
+    uSpike: { value: 0 },
     uPost: { value: 0 },
     uNeg: { value: 0 },
+    uScan: { value: 0 },
+    uChroma: { value: 0 },
   };
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);

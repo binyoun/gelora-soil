@@ -13,12 +13,18 @@ const EFFECTS: Array<{ key: keyof FlowerFx; label: string }> = [
   { key: 'wobble', label: 'wobble' },
   { key: 'mosh', label: 'datamosh' },
   { key: 'bar', label: 'signal bar' },
+  { key: 'slice', label: 'slices' },
+  { key: 'spike', label: 'spikes' },
   { key: 'posterize', label: 'bit-crush' },
   { key: 'negative', label: 'negative' },
+  { key: 'scanlines', label: 'scanlines' },
+  { key: 'chroma', label: 'chroma' },
   { key: 'wireframe', label: 'wireframe' },
   { key: 'shatter', label: 'shatter' },
   { key: 'melt', label: 'melt' },
   { key: 'flakes', label: 'flakes' },
+  { key: 'strobe', label: 'strobe' },
+  { key: 'judder', label: 'judder' },
 ];
 
 // A face-like portrait stand-in so effects read over a "selfie".
@@ -107,14 +113,20 @@ flowerSel.value = 'kadupul';
 flowerSel.addEventListener('change', () => buildFlower(flowerSel.value));
 
 const intensityEl = document.getElementById('intensity') as HTMLInputElement;
+const ivalEl = document.getElementById('ival')!;
+const updateReadout = () => { ivalEl.textContent = String(Math.round(parseFloat(intensityEl.value) * 100)); };
+intensityEl.addEventListener('input', updateReadout);
+updateReadout();
 
 const enabled: Partial<Record<keyof FlowerFx, boolean>> = {};
+const boxes = new Map<keyof FlowerFx, HTMLInputElement>();
 const fxEl = document.getElementById('fx')!;
 for (const e of EFFECTS) {
   const label = document.createElement('label');
   const cb = document.createElement('input');
   cb.type = 'checkbox';
   cb.dataset.fx = e.key;
+  boxes.set(e.key, cb);
   cb.addEventListener('change', () => {
     enabled[e.key] = cb.checked;
     label.classList.toggle('on', cb.checked);
@@ -124,10 +136,21 @@ for (const e of EFFECTS) {
   fxEl.appendChild(label);
 }
 
+function setEffect(key: keyof FlowerFx, on: boolean): void {
+  enabled[key] = on;
+  const cb = boxes.get(key);
+  if (cb) {
+    cb.checked = on;
+    cb.parentElement!.classList.toggle('on', on);
+  }
+}
+
+document.getElementById('preset-sf')!.addEventListener('click', () => {
+  for (const e of EFFECTS) setEffect(e.key, e.key === 'shatter' || e.key === 'flakes');
+});
+
 document.getElementById('none')!.addEventListener('click', () => {
-  for (const key of Object.keys(enabled) as Array<keyof FlowerFx>) enabled[key] = false;
-  fxEl.querySelectorAll('input').forEach((cb) => { (cb as HTMLInputElement).checked = false; });
-  fxEl.querySelectorAll('label').forEach((l) => l.classList.remove('on'));
+  for (const e of EFFECTS) setEffect(e.key, false);
 });
 
 let touchAt = -10;
