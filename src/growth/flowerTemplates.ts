@@ -41,6 +41,7 @@ export interface FlowerTemplate {
   centerScale: number;
   centerColor: number;
   stem: boolean;
+  petalColor: number; // the species' own colour, washed gently over the selfie (portrait stays dominant)
   roughness: number;
   emissive: number;
   emissiveIntensity: number;
@@ -54,6 +55,7 @@ export const TEMPLATES: FlowerTemplate[] = [
     id: 'tulip',
     name: 'semper augustus',
     story: 'a tulip whose flamed beauty was a virus that killed it. extinct.',
+    petalColor: 0xf3e9df,
     symmetry: 'radial',
     layers: [
       { count: 3, rMax: 0.42, scale: 1.0, tiltBias: 0, z: 0.0 }, // outer whorl, broader
@@ -77,6 +79,7 @@ export const TEMPLATES: FlowerTemplate[] = [
     id: 'chrysanthemum',
     name: 'chrysanthemum',
     story: 'the flower of graves and mourning.',
+    petalColor: 0xf0ece0,
     symmetry: 'radial',
     // a dense, rounded, incurved ball: rounded spoon petals curling inward,
     // no radiating spikes (distinct from the kadupul's flat spiky star)
@@ -104,6 +107,7 @@ export const TEMPLATES: FlowerTemplate[] = [
     id: 'kadupul',
     name: 'kadupul',
     story: 'blooms one night, dies by dawn. it cannot be picked.',
+    petalColor: 0xf2f6ff,
     symmetry: 'radial',
     // a flat, wide, luminous star: long thin pointed tepals radiating almost
     // level, glowing, prominent stamen tuft (distinct from the chrysanthemum ball)
@@ -129,6 +133,7 @@ export const TEMPLATES: FlowerTemplate[] = [
     id: 'ghost',
     name: 'ghost orchid',
     story: 'endangered, rootless, it seems to float in the dark.',
+    petalColor: 0xeaf2ee,
     symmetry: 'bilateral',
     layers: [],
     petal: { width: 0.16, sharp: 1.6, curl: 0.1, cup: 0.12, waveAmp: 0.03, waveFreq: 5, strap: 0 },
@@ -147,6 +152,7 @@ export const TEMPLATES: FlowerTemplate[] = [
     id: 'franklinia',
     name: 'franklinia',
     story: 'a tree found once beside a river, gone from the wild since 1803; every one alive was grown from a cutting.',
+    petalColor: 0xf6f1e6,
     symmetry: 'radial',
     // a broad white camellia-like bowl: rounded, faintly crinkled petals in a few
     // whorls around a dense golden stamen boss
@@ -173,6 +179,7 @@ export const TEMPLATES: FlowerTemplate[] = [
     id: 'kokio',
     name: "koki'o",
     story: 'a Hawaiian tree once down to a single plant, kept alive only by grafting it onto its cousins.',
+    petalColor: 0xb42a17,
     symmetry: 'radial',
     // a hibiscus-like whorl of narrow, upturned petals around a long stamen column
     layers: [
@@ -197,6 +204,7 @@ export const TEMPLATES: FlowerTemplate[] = [
     id: 'rafflesia',
     name: 'rafflesia',
     story: 'the corpse flower, the largest bloom on earth; it opens for a few days, reeks of the dead, then rots.',
+    petalColor: 0x9e3a22,
     symmetry: 'radial',
     // five huge, thick, leathery lobes around a dark spiked central disc
     layers: [
@@ -220,6 +228,7 @@ export const TEMPLATES: FlowerTemplate[] = [
     id: 'jade',
     name: 'jade vine',
     story: 'endangered, its unreal turquoise claws hang in the forest dark and glow for the bats that feed them.',
+    petalColor: 0x53cdbd,
     symmetry: 'bilateral', // a pendant cluster of hooked, luminous claws (see buildJadeVine)
     layers: [],
     petal: { width: 0.05, sharp: 1.0, curl: 0.12, cup: 0.16, waveAmp: 0.03, waveFreq: 5, strap: 0.8 },
@@ -238,6 +247,7 @@ export const TEMPLATES: FlowerTemplate[] = [
     id: 'cosmos',
     name: 'chocolate cosmos',
     story: 'extinct in the wild, every plant a clone of one; it smells of chocolate and never sets seed.',
+    petalColor: 0x3f1418,
     symmetry: 'radial',
     // a flat, open daisy: one ring of broad, faintly notched rays around a dark,
     // velvety central disc
@@ -261,6 +271,7 @@ export const TEMPLATES: FlowerTemplate[] = [
     id: 'middlemist',
     name: "middlemist's red",
     story: 'the rarest flower on earth: two plants are known to exist, one behind glass, one in a garden.',
+    petalColor: 0xd85c82,
     symmetry: 'radial',
     // a full formal camellia rosette: many rounded petals in tight rings, opening
     // to a flat face (distinct from the chrysanthemum's tight incurved ball)

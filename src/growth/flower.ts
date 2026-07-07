@@ -10,6 +10,8 @@ const MAX_PARTICLES = 440;
 const PARTICLE_LIFETIME_S = 5.0; // long enough to trail down to the bottom
 const FLAKE_UV_PATCH = 0.16; // each residue flake samples this fraction of the photo
 const DEG = Math.PI / 180;
+const PORTRAIT_TINT_MIX = 0.5; // 0 = full species colour, 1 = untinted portrait (portrait-forward)
+const DNA_HUE_NUDGE = 0.12; // how far the capture's hue pulls the species tint (species stays dominant)
 
 interface PetalParam {
   mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>;
@@ -61,6 +63,14 @@ export class Flower {
     this.group = new THREE.Group();
     const rand = mulberry32(dna.seed);
     const tintColor = new THREE.Color().setHSL(dna.hueCenter / 360, Math.max(0.4, dna.saturation), 0.55);
+    // Portrait-forward species colour: a gentle wash of the flower's own colour
+    // over the selfie (multiplied), so the portrait stays a colour photo and the
+    // species reads as an accent. The participant's dominant hue nudges it a
+    // little so no two blooms are identical, with the species still dominant.
+    const petalTint = new THREE.Color(template.petalColor).lerp(new THREE.Color(0xffffff), PORTRAIT_TINT_MIX);
+    const tintHSL = { h: 0, s: 0, l: 0 };
+    petalTint.getHSL(tintHSL);
+    petalTint.setHSL((tintHSL.h + (dna.hueCenter / 360 - tintHSL.h) * DNA_HUE_NUDGE + 1) % 1, tintHSL.s, tintHSL.l);
     this.openBase = template.openBaseDeg;
     this.closeExtra = template.closeExtraDeg;
     this.centerScaleFactor = template.centerScale;
@@ -70,7 +80,7 @@ export class Flower {
 
     this.mat = new THREE.MeshStandardMaterial({
       map: photo,
-      color: 0xffffff,
+      color: petalTint,
       roughness: template.roughness,
       metalness: 0.0,
       side: THREE.DoubleSide,
