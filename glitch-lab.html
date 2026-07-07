@@ -21,7 +21,7 @@
     select, input[type=range] { font-family: inherit; }
     select { background: rgba(0,0,0,0.4); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 0.35em 0.5em; font-size: 0.75rem; }
     input[type=range] { accent-color: var(--accent); width: 130px; vertical-align: middle; }
-    #ival { display: inline-block; min-width: 2.2em; text-align: right; color: var(--accent); font-size: 0.75rem; }
+    #ival, #sval { display: inline-block; min-width: 2.2em; text-align: right; color: var(--accent); font-size: 0.75rem; }
     #note { font-size: 0.66rem; letter-spacing: 0.06em; color: var(--muted); opacity: 0.8; }
     #fx { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: 0.4rem 0.8rem; }
     #fx label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; letter-spacing: 0.04em; padding: 0.3rem 0.1rem; cursor: pointer; }
@@ -43,6 +43,7 @@
     <div class="top">
       <label class="field">flower <select id="flower"></select></label>
       <label class="field">intensity <input id="intensity" type="range" min="0" max="1" step="0.01" value="0.8" /><span id="ival">80</span></label>
+      <label class="field">size <input id="size" type="range" min="10" max="100" step="1" value="40" /><span id="sval">40</span></label>
       <div class="btns">
         <button id="touch" title="simulates a hand touching the bloom: a brief glitch spike on the enabled effects">pulse touch</button>
         <button id="preset-sf">shatter+flakes</button>

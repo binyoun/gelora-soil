@@ -118,6 +118,12 @@ const updateReadout = () => { ivalEl.textContent = String(Math.round(parseFloat(
 intensityEl.addEventListener('input', updateReadout);
 updateReadout();
 
+const sizeEl = document.getElementById('size') as HTMLInputElement;
+const svalEl = document.getElementById('sval')!;
+const updateSize = () => { svalEl.textContent = sizeEl.value; };
+sizeEl.addEventListener('input', updateSize);
+updateSize();
+
 const enabled: Partial<Record<keyof FlowerFx, boolean>> = {};
 const boxes = new Map<keyof FlowerFx, HTMLInputElement>();
 const fxEl = document.getElementById('fx')!;
@@ -174,7 +180,8 @@ function loop(now: number): void {
       flower.fx[e.key] = enabled[e.key] ? Math.min(1, master * surge) : 0;
     }
     flower.group.rotation.y = Math.sin(clock * 0.4) * 0.5;
-    flower.update(dna, growth, origin, 0.32, true, clock, dt, null);
+    const handScale = parseInt(sizeEl.value, 10) / 125; // size 10..100 -> ~0.08..0.8
+    flower.update(dna, growth, origin, handScale, true, clock, dt, null);
   }
   renderer.render(scene, camera);
   requestAnimationFrame(loop);
